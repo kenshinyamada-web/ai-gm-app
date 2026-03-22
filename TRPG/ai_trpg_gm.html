@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>エモクロアTRPG AI ディーラー</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080810;
+    --surface: #0e0e1a;
+    --surface2: #16162a;
+    --border: #2a2a4a;
+    --purple: #8a6fc8;
+    --purple-dim: #4a3a78;
+    --purple-bright: #b090f0;
+    --teal: #4a9a9a;
+    --teal-bright: #70caca;
+    --red: #8b2020;
+    --red-bright: #c43030;
+    --text: #d8d0f0;
+    --text-dim: #6a6090;
+    --glow: rgba(138,111,200,0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Crimson Text', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.5;
+  }
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  header {
+    text-align: center;
+    padding: 24px 0 16px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  header::before, header::after {
+    content: '◈';
+    position: absolute;
+    bottom: -10px;
+    font-size: 12px;
+    color: var(--purple);
+    background: var(--bg);
+    padding: 0 8px;
+  }
+  header::before { left: calc(50% - 80px); }
+  header::after { left: calc(50% + 60px); }
+  .title {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(20px, 4vw, 36px);
+    font-weight: 900;
+    color: var(--purple-bright);
+    text-shadow: 0 0 40px rgba(138,111,200,0.5), 0 2px 4px rgba(0,0,0,0.8);
+    letter-spacing: 0.08em;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+    margin-top: 6px;
+    font-style: italic;
+  }
+  .setup-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .setup-panel label {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    color: var(--purple-dim);
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+  .setup-panel input {
+    flex: 1;
+    min-width: 200px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    font-family: monospace;
+    font-size: 13px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .setup-panel input:focus { border-color: var(--purple-dim); }
+  .setup-panel input::placeholder { color: var(--text-dim); }
+
+  /* キャラクター作成 */
+  .character-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .panel-title {
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    color: var(--purple);
+    letter-spacing: 0.2em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, var(--border), transparent);
+  }
+  .char-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .char-grid .full { grid-column: 1 / -1; }
+  .field-group { display: flex; flex-direction: column; gap: 5px; }
+  .field-group label {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .field-group input, .field-group select, .field-group textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    font-family: 'Crimson Text', serif;
+    font-size: 15px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.2s;
+    resize: none;
+  }
+  .field-group input:focus,
+  .field-group select:focus,
+  .field-group textarea:focus { border-color: var(--purple-dim); }
+  .field-group textarea { min-height: 70px; }
+  .field-group select option { background: var(--surface2); }
+
+  /* 能力値グリッド */
+  .ability-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .ability-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .ability-item label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+  .ability-item input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--purple-bright);
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    width: 48px;
+    text-align: center;
+    outline: none;
+  }
+  .ability-item input:focus { border-bottom-color: var(--purple); }
+  .ability-item .ability-sub { font-size: 10px; color: var(--text-dim); }
+  .stat-bar {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 16px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .stat-item label { font-size: 10px; color: var(--text-dim); letter-spacing: 0.1em; }
+  .stat-item .stat-val {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    color: var(--teal-bright);
+  }
+  .point-hint { font-size: 12px; color: var(--text-dim); font-style: italic; }
+  .point-remaining { font-size: 13px; color: var(--purple); font-family: 'Cinzel', serif; }
+
+  /* 共鳴感情 */
+  .emotion-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .emotion-item { display: flex; flex-direction: column; gap: 5px; }
+  .emotion-item label {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+  .emotion-item select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    font-family: 'Crimson Text', serif;
+    font-size: 14px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .emotion-item select:focus { border-color: var(--purple-dim); }
+  .emotion-item select option { background: var(--surface2); }
+
+  /* シナリオ */
+  #scenario-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 24px;
+    display: none;
+  }
+  .scenario-text {
+    font-size: 17px;
+    line-height: 1.9;
+    color: var(--text);
+    font-style: italic;
+    white-space: pre-wrap;
+  }
+
+  /* ログ */
+  #log {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    min-height: 200px;
+    max-height: 420px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    display: none;
+    scroll-behavior: smooth;
+  }
+  #log::-webkit-scrollbar { width: 4px; }
+  #log::-webkit-scrollbar-track { background: transparent; }
+  #log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-entry {
+    display: flex;
+    gap: 12px;
+    animation: fadeIn 0.4s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .log-speaker {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    min-width: 68px;
+    padding-top: 3px;
+    text-align: right;
+  }
+  .log-speaker.dl { color: var(--purple); }
+  .log-speaker.player { color: var(--teal); }
+  .log-speaker.system { color: var(--text-dim); }
+  .log-text {
+    font-size: 16px;
+    line-height: 1.75;
+    flex: 1;
+    border-left: 2px solid var(--border);
+    padding-left: 12px;
+  }
+  .log-entry.dl .log-text { border-color: var(--purple-dim); font-style: italic; }
+  .log-entry.player .log-text { border-color: #2a5a5a; color: #90d0d0; }
+  .log-entry.system .log-text {
+    border-color: var(--border);
+    color: var(--text-dim);
+    font-size: 13px;
+    font-style: normal;
+    background: rgba(138,111,200,0.05);
+    padding: 6px 12px;
+    border-radius: 0 3px 3px 0;
+  }
+
+  /* ステータス表示（セッション中） */
+  #session-stats {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 16px;
+    display: none;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .session-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .session-stat label { font-size: 10px; color: var(--text-dim); letter-spacing: 0.1em; }
+  .session-stat .val {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+  }
+  .val.hp { color: var(--teal-bright); }
+  .val.mp { color: #7a9abf; }
+  .val.kyoumei { color: var(--purple); }
+  .val.kyoumei.danger { color: var(--red-bright); animation: pulse-text 1s infinite; }
+  @keyframes pulse-text {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* ダイスパネル */
+  #dice-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 18px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dice-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .dice-input-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+  .dice-input-group input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--purple-bright);
+    padding: 5px 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    width: 56px;
+    text-align: center;
+    border-radius: 2px;
+    outline: none;
+  }
+  .dice-input-group input:focus { border-color: var(--purple-dim); }
+  .dice-result {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    padding: 6px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    min-width: 200px;
+    color: var(--text);
+  }
+  .dice-result .result-grade { color: var(--purple-bright); font-weight: bold; }
+  .dice-result .result-grade.critical { color: #f0a000; }
+  .dice-result .result-grade.fumble { color: var(--red-bright); }
+
+  /* コントロール */
+  .controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .btn {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    padding: 11px 24px;
+    border: 1px solid;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .btn-primary { background: transparent; border-color: var(--purple); color: var(--purple); }
+  .btn-primary:hover { background: var(--glow); box-shadow: 0 0 20px rgba(138,111,200,0.25); }
+  .btn-danger { background: transparent; border-color: var(--red); color: var(--red); }
+  .btn-danger:hover { background: rgba(139,32,32,0.15); border-color: var(--red-bright); color: var(--red-bright); }
+  .btn-secondary { background: transparent; border-color: var(--border); color: var(--text-dim); }
+  .btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
+  .btn-teal { background: transparent; border-color: var(--teal); color: var(--teal); }
+  .btn-teal:hover { background: rgba(74,154,154,0.1); border-color: var(--teal-bright); color: var(--teal-bright); }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+  /* 音声ボタン */
+  #voice-btn {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    border: 2px solid var(--purple-dim);
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    display: none;
+  }
+  #voice-btn:hover { border-color: var(--purple); box-shadow: 0 0 30px rgba(138,111,200,0.3); }
+  #voice-btn.recording {
+    border-color: var(--red-bright);
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(196,48,48,0.4); }
+    70% { box-shadow: 0 0 0 16px rgba(196,48,48,0); }
+    100% { box-shadow: 0 0 0 0 rgba(196,48,48,0); }
+  }
+  #voice-btn svg { transition: fill 0.3s; }
+  #voice-btn.recording svg { fill: var(--red-bright); }
+  .voice-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    display: none;
+  }
+  .voice-hint { font-size: 13px; color: var(--text-dim); letter-spacing: 0.05em; }
+  #status {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-dim);
+    min-height: 20px;
+    font-style: italic;
+  }
+  #status.active { color: var(--purple-dim); }
+  #status.error { color: var(--red-bright); }
+  .thinking::after {
+    content: '';
+    animation: dots 1.2s infinite;
+  }
+  @keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+  }
+
+  /* タブ */
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .tab-btn.active { color: var(--purple); border-bottom-color: var(--purple); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* セーブバー */
+  .save-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .save-bar .save-name {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    color: var(--purple-bright);
+    flex: 1;
+  }
+  .save-bar .save-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+  .save-bar .save-kyoumei {
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    color: var(--purple);
+    background: rgba(138,111,200,0.1);
+    border: 1px solid var(--purple-dim);
+    border-radius: 3px;
+    padding: 3px 10px;
+  }
+  .btn-xs {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    padding: 6px 14px;
+    border: 1px solid;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    background: transparent;
+  }
+  .btn-xs.btn-save { border-color: var(--teal); color: var(--teal); }
+  .btn-xs.btn-save:hover { background: rgba(74,154,154,0.1); }
+  .btn-xs.btn-new { border-color: var(--border); color: var(--text-dim); }
+  .btn-xs.btn-new:hover { border-color: var(--text-dim); color: var(--text); }
+
+  /* ─── 技能タブ ─────────────────────────── */
+  .skill-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 0 6px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .skill-pts-display { font-size: 13px; color: var(--text-dim); }
+  .skill-pts-num { font-family: 'Cinzel', serif; font-size: 22px; }
+  .skill-pts-num.ok   { color: var(--purple); }
+  .skill-pts-num.warn { color: var(--red-bright); }
+  #tab-skill-inner {
+    max-height: 460px;
+    overflow-y: auto;
+    padding-right: 6px;
+  }
+  #tab-skill-inner::-webkit-scrollbar { width: 3px; }
+  #tab-skill-inner::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .skill-cat-block { margin-bottom: 14px; }
+  .skill-cat-title {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 5px;
+  }
+  .skill-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px 6px;
+  }
+  .skill-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 5px;
+    border-radius: 3px;
+    cursor: help;
+    transition: background 0.15s;
+    min-width: 0;
+  }
+  .skill-row:hover { background: rgba(138,111,200,0.1); }
+  .skill-row.inactive { opacity: 0.4; }
+  .skill-name {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .skill-tag {
+    font-size: 9px;
+    padding: 1px 3px;
+    border-radius: 2px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .skill-tag.base { color: var(--teal); border: 1px solid var(--teal); }
+  .skill-tag.ex   { color: #d4a000;     border: 1px solid #d4a000; }
+  .skill-lv-group { display: flex; gap: 2px; flex-shrink: 0; }
+  .skill-lv-btn {
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .skill-lv-btn:hover:not(:disabled) { border-color: var(--purple-dim); color: var(--purple); }
+  .skill-lv-btn.active { background: var(--purple-dim); border-color: var(--purple); color: var(--purple-bright); }
+  .skill-lv-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+  .skill-cost-label { font-size: 10px; min-width: 24px; text-align: right; flex-shrink: 0; }
+  .skill-custom-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--teal);
+    font-family: 'Crimson Text', serif;
+    font-size: 11px;
+    width: 56px;
+    outline: none;
+    padding: 0 2px;
+    margin-left: 2px;
+  }
+  .skill-custom-input:focus { border-bottom-color: var(--purple-dim); }
+
+  /* ツールチップ */
+  #skill-tooltip {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--purple-dim);
+    border-radius: 4px;
+    padding: 10px 14px;
+    max-width: 260px;
+    font-size: 13px;
+    z-index: 9999;
+    pointer-events: none;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+    display: none;
+  }
+  #skill-tooltip .tt-name {
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    color: var(--purple-bright);
+    margin-bottom: 4px;
+  }
+  #skill-tooltip .tt-ability {
+    font-size: 11px;
+    color: var(--teal);
+    margin-bottom: 6px;
+  }
+  #skill-tooltip .tt-desc {
+    color: var(--text);
+    line-height: 1.65;
+    font-style: italic;
+  }
+  #skill-tooltip .tt-cost {
+    margin-top: 7px;
+    font-size: 11px;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+    padding-top: 5px;
+  }
+
+  @media (max-width: 600px) {
+    .ability-grid { grid-template-columns: repeat(4, 1fr); }
+    .char-grid { grid-template-columns: 1fr; }
+    .char-grid .full { grid-column: 1; }
+    .emotion-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="title">エモクロア TRPG</div>
+    <div class="subtitle">AI Dealer — 《怪異》とあなたが織りなす物語</div>
+  </header>
+
+  <!-- APIキー -->
+  <div class="setup-panel">
+    <label>🔑 API KEY</label>
+    <input type="password" id="api-key" placeholder="AIza... (Google AI StudioのAPIキー)" />
+  </div>
+
+  <!-- セーブバー（保存済みデータがある時に表示） -->
+  <div class="save-bar" id="save-bar" style="display:none;">
+    <span class="save-name" id="save-bar-name">—</span>
+    <span class="save-meta" id="save-bar-meta"></span>
+    <span class="save-kyoumei" id="save-bar-kyoumei">∞共鳴 Lv.1</span>
+    <button class="btn-xs btn-new" onclick="clearCharacter()">新規作成</button>
+  </div>
+
+  <!-- キャラクター作成パネル -->
+  <div class="character-panel" id="char-panel">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('tab-basic')">基本情報</button>
+      <button class="tab-btn" onclick="switchTab('tab-ability')">能力値</button>
+      <button class="tab-btn" onclick="switchTab('tab-emotion')">共鳴感情</button>
+      <button class="tab-btn" onclick="switchTab('tab-skill')">技能</button>
+    </div>
+
+    <!-- 基本情報タブ -->
+    <div class="tab-content active" id="tab-basic">
+      <div class="char-grid" style="margin-top:16px">
+        <div class="field-group">
+          <label>共鳴者名</label>
+          <input type="text" id="char-name" placeholder="例：桐嶋 奈々" />
+        </div>
+        <div class="field-group">
+          <label>年齢・性別</label>
+          <input type="text" id="char-age" placeholder="例：22歳・女性" />
+        </div>
+        <div class="field-group">
+          <label>職業</label>
+          <input type="text" id="char-class" placeholder="例：大学院生" />
+        </div>
+        <div class="field-group">
+          <label>外見的特徴</label>
+          <input type="text" id="char-appearance" placeholder="例：黒髪ショート、眼鏡" />
+        </div>
+        <div class="field-group full">
+          <label>背景・経歴</label>
+          <textarea id="char-bg" placeholder="例：地方出身で上京後、先輩の不審な失踪をきっかけに《怪異》の存在を知った。"></textarea>
+        </div>
+        <div class="field-group">
+          <label>シナリオ設定</label>
+          <select id="scenario-type">
+            <option value="mystery">日常の謎・怪奇事件</option>
+            <option value="horror">恐怖・逃走サバイバル</option>
+            <option value="investigation">調査・真相解明</option>
+            <option value="encounter">《怪異》との邂逅</option>
+            <option value="urban">都市伝説探索</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>ディーラースタイル</label>
+          <select id="dl-style">
+            <option value="mystery">謎多き・情報小出し</option>
+            <option value="horror">恐怖重視・緊張感</option>
+            <option value="dramatic">ドラマチック・感情豊か</option>
+            <option value="serious">シリアス・重厚</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 能力値タブ -->
+    <div class="tab-content" id="tab-ability">
+      <div style="margin-top:16px; display:flex; flex-direction:column; gap:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <span class="point-hint">7能力値（運勢以外）に合計25点を配分（各1〜6）</span>
+          <span class="point-remaining">残りポイント: <span id="point-left">25</span></span>
+        </div>
+        <div class="ability-grid">
+          <div class="ability-item">
+            <label>身体</label>
+            <input type="number" id="ab-body" min="1" max="6" value="3" oninput="updateStats()" />
+            <span class="ability-sub">HP+</span>
+          </div>
+          <div class="ability-item">
+            <label>器用</label>
+            <input type="number" id="ab-dex" min="1" max="6" value="3" oninput="updateStats()" />
+            <span class="ability-sub">手作業</span>
+          </div>
+          <div class="ability-item">
+            <label>精神</label>
+            <input type="number" id="ab-mind" min="1" max="6" value="3" oninput="updateStats()" />
+            <span class="ability-sub">MP+</span>
+          </div>
+          <div class="ability-item">
+            <label>五感</label>
+            <input type="number" id="ab-sense" min="1" max="6" value="3" oninput="updateStats()" />
+            <span class="ability-sub">知覚</span>
+          </div>
+          <div class="ability-item">
+            <label>知力</label>
+            <input type="number" id="ab-int" min="1" max="6" value="3" oninput="updateStats()" />
+            <span class="ability-sub">MP+</span>
+          </div>
+          <div class="ability-item">
+            <label>魅力</label>
+            <input type="number" id="ab-charm" min="1" max="6" value="3" oninput="updateStats()" />
+            <span class="ability-sub">交渉</span>
+          </div>
+          <div class="ability-item">
+            <label>社会</label>
+            <input type="number" id="ab-social" min="1" max="6" value="3" oninput="updateStats()" />
+            <span class="ability-sub">人脈</span>
+          </div>
+          <div class="ability-item">
+            <label>運勢</label>
+            <input type="number" id="ab-luck" min="1" max="6" value="3" oninput="updateStats()" />
+            <span class="ability-sub">1D6</span>
+          </div>
+        </div>
+        <div class="stat-bar">
+          <div class="stat-item">
+            <label>HP</label>
+            <span class="stat-val" id="calc-hp">—</span>
+          </div>
+          <div class="stat-item">
+            <label>MP</label>
+            <span class="stat-val" id="calc-mp">—</span>
+          </div>
+          <div class="stat-item">
+            <label>∞共鳴</label>
+            <span class="stat-val" style="color:var(--purple)">Lv.1</span>
+          </div>
+          <span class="point-hint" style="margin-left:auto">HP = 身体+10 ／ MP = 精神+知力</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 共鳴感情タブ -->
+    <div class="tab-content" id="tab-emotion">
+      <div style="margin-top:16px; display:flex; flex-direction:column; gap:14px;">
+        <p style="font-size:13px; color:var(--text-dim); font-style:italic;">
+          3つの感情を選び「表（外面）」「裏（内面）」「ルーツ（根源）」に割り振ります。《怪異》の感情と一致すると共鳴判定が有利になります。
+        </p>
+        <div class="emotion-grid">
+          <div class="emotion-item">
+            <label>表（おもて） — 外面的感情</label>
+            <select id="em-omote">
+              <option value="">— 選択 —</option>
+              <optgroup label="欲望">
+                <option>自己顕示（欲望）</option><option>所有（欲望）</option><option>本能（欲望）</option>
+                <option>破壊（欲望）</option><option>優越感（欲望）</option><option>怠惰（欲望）</option>
+                <option>逃避（欲望）</option><option>好奇心（欲望）</option><option>スリル（欲望）</option>
+              </optgroup>
+              <optgroup label="情念">
+                <option>喜び（情念）</option><option>怒り（情念）</option><option>哀しみ（情念）</option>
+                <option>幸福（情念）</option><option>不安（情念）</option><option>嫌悪（情念）</option>
+                <option>恐怖（情念）</option><option>嫉妬（情念）</option><option>恨み（情念）</option>
+              </optgroup>
+              <optgroup label="理想">
+                <option>正義（理想）</option><option>崇拝（理想）</option><option>希望（理想）</option>
+                <option>向上（理想）</option><option>理性（理想）</option><option>勝利（理想）</option>
+                <option>秩序（理想）</option><option>憧憬（理想）</option><option>無我（理想）</option>
+              </optgroup>
+              <optgroup label="関係">
+                <option>友情（関係）</option><option>愛（関係）</option><option>恋（関係）</option>
+                <option>依存（関係）</option><option>尊敬（関係）</option><option>軽蔑（関係）</option>
+                <option>庇護（関係）</option><option>支配（関係）</option><option>奉仕（関係）</option>
+              </optgroup>
+              <optgroup label="傷">
+                <option>後悔（傷）</option><option>孤独（傷）</option><option>諦観（傷）</option>
+                <option>絶望（傷）</option><option>否定（傷）</option><option>疑念（傷）</option>
+                <option>罪悪感（傷）</option><option>狂気（傷）</option><option>劣等感（傷）</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="emotion-item">
+            <label>裏（うら） — 内面的感情</label>
+            <select id="em-ura">
+              <option value="">— 選択 —</option>
+              <optgroup label="欲望">
+                <option>自己顕示（欲望）</option><option>所有（欲望）</option><option>本能（欲望）</option>
+                <option>破壊（欲望）</option><option>優越感（欲望）</option><option>怠惰（欲望）</option>
+                <option>逃避（欲望）</option><option>好奇心（欲望）</option><option>スリル（欲望）</option>
+              </optgroup>
+              <optgroup label="情念">
+                <option>喜び（情念）</option><option>怒り（情念）</option><option>哀しみ（情念）</option>
+                <option>幸福（情念）</option><option>不安（情念）</option><option>嫌悪（情念）</option>
+                <option>恐怖（情念）</option><option>嫉妬（情念）</option><option>恨み（情念）</option>
+              </optgroup>
+              <optgroup label="理想">
+                <option>正義（理想）</option><option>崇拝（理想）</option><option>希望（理想）</option>
+                <option>向上（理想）</option><option>理性（理想）</option><option>勝利（理想）</option>
+                <option>秩序（理想）</option><option>憧憬（理想）</option><option>無我（理想）</option>
+              </optgroup>
+              <optgroup label="関係">
+                <option>友情（関係）</option><option>愛（関係）</option><option>恋（関係）</option>
+                <option>依存（関係）</option><option>尊敬（関係）</option><option>軽蔑（関係）</option>
+                <option>庇護（関係）</option><option>支配（関係）</option><option>奉仕（関係）</option>
+              </optgroup>
+              <optgroup label="傷">
+                <option>後悔（傷）</option><option>孤独（傷）</option><option>諦観（傷）</option>
+                <option>絶望（傷）</option><option>否定（傷）</option><option>疑念（傷）</option>
+                <option>罪悪感（傷）</option><option>狂気（傷）</option><option>劣等感（傷）</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="emotion-item">
+            <label>ルーツ — 根源的感情</label>
+            <select id="em-roots">
+              <option value="">— 選択 —</option>
+              <optgroup label="欲望">
+                <option>自己顕示（欲望）</option><option>所有（欲望）</option><option>本能（欲望）</option>
+                <option>破壊（欲望）</option><option>優越感（欲望）</option><option>怠惰（欲望）</option>
+                <option>逃避（欲望）</option><option>好奇心（欲望）</option><option>スリル（欲望）</option>
+              </optgroup>
+              <optgroup label="情念">
+                <option>喜び（情念）</option><option>怒り（情念）</option><option>哀しみ（情念）</option>
+                <option>幸福（情念）</option><option>不安（情念）</option><option>嫌悪（情念）</option>
+                <option>恐怖（情念）</option><option>嫉妬（情念）</option><option>恨み（情念）</option>
+              </optgroup>
+              <optgroup label="理想">
+                <option>正義（理想）</option><option>崇拝（理想）</option><option>希望（理想）</option>
+                <option>向上（理想）</option><option>理性（理想）</option><option>勝利（理想）</option>
+                <option>秩序（理想）</option><option>憧憬（理想）</option><option>無我（理想）</option>
+              </optgroup>
+              <optgroup label="関係">
+                <option>友情（関係）</option><option>愛（関係）</option><option>恋（関係）</option>
+                <option>依存（関係）</option><option>尊敬（関係）</option><option>軽蔑（関係）</option>
+                <option>庇護（関係）</option><option>支配（関係）</option><option>奉仕（関係）</option>
+              </optgroup>
+              <optgroup label="傷">
+                <option>後悔（傷）</option><option>孤独（傷）</option><option>諦観（傷）</option>
+                <option>絶望（傷）</option><option>否定（傷）</option><option>疑念（傷）</option>
+                <option>罪悪感（傷）</option><option>狂気（傷）</option><option>劣等感（傷）</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+        <p style="font-size:12px; color:var(--text-dim); font-style:italic;">
+          ※感情マッチング：完全一致でダイス数×2、ルーツ属性一致でダイス数+1
+        </p>
+      </div>
+    </div>
+
+    <!-- 技能タブ -->
+    <div class="tab-content" id="tab-skill">
+      <div style="margin-top:12px;">
+        <div class="skill-header">
+          <div class="skill-pts-display">
+            技能ポイント残り <span class="skill-pts-num ok" id="skill-pts-left">30</span>
+            <span style="font-size:12px; color:var(--border)">（消費: <span id="skill-pts-spent">0</span> / 30pt）</span>
+          </div>
+          <span style="font-size:11px; color:var(--text-dim)">＊ベース技能Lv1は無料 ／ ★EXはポイント2倍</span>
+        </div>
+        <div id="tab-skill-inner">
+          <div id="skill-list-container"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 開始ボタン -->
+  <div class="controls" id="main-controls">
+    <button class="btn btn-teal btn-xs" style="padding:11px 20px; font-size:11px;" onclick="saveCharacter()">◇ 保存</button>
+    <button class="btn btn-primary" id="start-btn" onclick="startSession()">◈ セッション開始 ◈</button>
+  </div>
+
+  <!-- セッション中ステータス -->
+  <div id="session-stats" style="display:none; flex-direction:row;">
+    <div class="session-stat">
+      <label>HP</label><span class="val hp" id="sess-hp">—</span>
+    </div>
+    <div class="session-stat">
+      <label>MP</label><span class="val mp" id="sess-mp">—</span>
+    </div>
+    <div class="session-stat">
+      <label>∞共鳴</label><span class="val kyoumei" id="sess-kyoumei">Lv.1</span>
+    </div>
+    <div class="session-stat" style="margin-left:auto; flex-direction:row; gap:8px; align-items:center;">
+      <label style="margin:0">共鳴者：</label>
+      <span id="sess-name" style="font-size:14px; color:var(--text)">—</span>
+    </div>
+  </div>
+
+  <!-- オープニングシーン -->
+  <div id="scenario-box">
+    <div class="panel-title">序章</div>
+    <div class="scenario-text" id="scenario-text"></div>
+  </div>
+
+  <!-- 会話ログ -->
+  <div id="log"></div>
+
+  <!-- ダイスパネル -->
+  <div id="dice-panel">
+    <div class="panel-title">判定ツール</div>
+    <div class="dice-row">
+      <div class="dice-input-group">
+        <input type="number" id="dice-count" min="1" max="20" value="1" />
+        <span>D10 ≤</span>
+        <input type="number" id="dice-target" min="1" max="10" value="5" />
+      </div>
+      <button class="btn btn-teal" onclick="rollDice()" style="padding:8px 18px; font-size:10px;">ダイスを振る</button>
+    </div>
+    <div class="dice-result" id="dice-result" style="display:none;"></div>
+  </div>
+
+  <!-- 音声エリア -->
+  <div class="voice-area" id="voice-area">
+    <button id="voice-btn" onclick="toggleVoice()">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="#b090f0" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1 19.93V22h2v-1.07A8.001 8.001 0 0 0 20 13h-2a6 6 0 0 1-12 0H4a8.001 8.001 0 0 0 7 7.93z"/>
+      </svg>
+    </button>
+    <div class="voice-hint" id="voice-hint">ボタンを押して話す</div>
+    <div class="controls">
+      <button class="btn btn-teal" onclick="toggleDicePanel()">ダイス判定</button>
+      <button class="btn btn-secondary" onclick="endSession()">セッション終了</button>
+    </div>
+  </div>
+
+  <div id="status"></div>
+</div>
+
+<!-- 技能ツールチップ -->
+<div id="skill-tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-ability" id="tt-ability"></div>
+  <div class="tt-desc" id="tt-desc"></div>
+  <div class="tt-cost" id="tt-cost"></div>
+</div>
+
+<script>
+// ─── 状態管理 ───────────────────────────────
+let sessionActive = false;
+let conversationHistory = [];
+let sessionSystemPrompt = '';
+let currentHP = 0;
+let maxHP = 0;
+let currentMP = 0;
+let maxMP = 0;
+let kyoumeiLevel = 1;
+
+// ─── UI ヘルパー ─────────────────────────────
+function setStatus(msg, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = type;
+}
+
+function addLog(speaker, text, cls = '') {
+  const log = document.getElementById('log');
+  const speakerClass = cls || (speaker === 'DL' ? 'dl' : speaker === 'You' ? 'player' : 'system');
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${speakerClass}`;
+  entry.innerHTML = `
+    <div class="log-speaker ${speakerClass}">${speaker}</div>
+    <div class="log-text">${text}</div>
+  `;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+}
+
+function addThinkingEntry() {
+  const log = document.getElementById('log');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry dl';
+  entry.id = 'thinking-entry';
+  entry.innerHTML = `
+    <div class="log-speaker dl">DL</div>
+    <div class="log-text thinking" style="color:var(--text-dim)">思考中</div>
+  `;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+}
+
+function removeThinkingEntry() {
+  const el = document.getElementById('thinking-entry');
+  if (el) el.remove();
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ─── 能力値計算 ──────────────────────────────
+function getAbility(id) {
+  return parseInt(document.getElementById(id).value) || 0;
+}
+
+function updateStats() {
+  const body = getAbility('ab-body');
+  const mind = getAbility('ab-mind');
+  const intel = getAbility('ab-int');
+  const abilities = ['ab-body','ab-dex','ab-mind','ab-sense','ab-int','ab-charm','ab-social'];
+  const total = abilities.reduce((s, id) => s + getAbility(id), 0);
+  const left = 25 - total;
+  document.getElementById('point-left').textContent = left;
+  document.getElementById('point-left').style.color = left < 0 ? 'var(--red-bright)' : 'var(--purple)';
+  document.getElementById('calc-hp').textContent = body + 10;
+  document.getElementById('calc-mp').textContent = mind + intel;
+}
+
+// ─── ダイス ──────────────────────────────────
+function rollDice() {
+  const count = parseInt(document.getElementById('dice-count').value) || 1;
+  const target = parseInt(document.getElementById('dice-target').value) || 5;
+  const rolls = [];
+  for (let i = 0; i < count; i++) rolls.push(Math.floor(Math.random() * 10) + 1);
+
+  let successes = 0;
+  const rollDisplay = rolls.map(r => {
+    if (r === 1) { successes += 2; return `<span style="color:#f0a000">${r}★</span>`; }
+    if (r === 10) { successes -= 1; return `<span style="color:var(--red-bright)">${r}✕</span>`; }
+    if (r <= target) { successes++; return `<span style="color:var(--teal-bright)">${r}</span>`; }
+    return `<span style="color:var(--text-dim)">${r}</span>`;
+  }).join(' ');
+
+  let grade, gradeClass;
+  if (successes <= -1) { grade = 'ファンブル'; gradeClass = 'fumble'; }
+  else if (successes === 0) { grade = '失敗'; gradeClass = 'fumble'; }
+  else if (successes === 1) { grade = 'シングル'; gradeClass = ''; }
+  else if (successes === 2) { grade = 'ダブル'; gradeClass = ''; }
+  else if (successes === 3) { grade = 'トリプル'; gradeClass = 'critical'; }
+  else if (successes <= 9) { grade = 'ミラクル'; gradeClass = 'critical'; }
+  else { grade = 'カタストロフ'; gradeClass = 'critical'; }
+
+  const resultEl = document.getElementById('dice-result');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = `[${rollDisplay}] 成功数: ${successes} → <span class="result-grade ${gradeClass}">${grade}</span>`;
+
+  if (sessionActive) {
+    addLog('DICE', `${count}D10 ≤ ${target} ：${rolls.join(', ')}  成功数${successes} →【${grade}】`, 'system');
+  }
+}
+
+function toggleDicePanel() {
+  const panel = document.getElementById('dice-panel');
+  panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+  panel.style.flexDirection = 'column';
+}
+
+// ─── セッションステータス更新 ─────────────────
+function updateSessionStats() {
+  document.getElementById('sess-hp').textContent = `${currentHP} / ${maxHP}`;
+  document.getElementById('sess-mp').textContent = `${currentMP} / ${maxMP}`;
+  const kyoEl = document.getElementById('sess-kyoumei');
+  kyoEl.textContent = `Lv.${kyoumeiLevel}`;
+  kyoEl.className = `val kyoumei${kyoumeiLevel >= 8 ? ' danger' : ''}`;
+}
+
+// ─── システムプロンプト構築 ─────────────────
+function buildSystemPrompt() {
+  const name = document.getElementById('char-name').value || '名無しの共鳴者';
+  const age  = document.getElementById('char-age').value || '不明';
+  const cls  = document.getElementById('char-class').value || '一般市民';
+  const app  = document.getElementById('char-appearance').value || '記載なし';
+  const bg   = document.getElementById('char-bg').value || '普通の人間';
+
+  const body   = getAbility('ab-body');
+  const dex    = getAbility('ab-dex');
+  const mind   = getAbility('ab-mind');
+  const sense  = getAbility('ab-sense');
+  const intel  = getAbility('ab-int');
+  const charm  = getAbility('ab-charm');
+  const social = getAbility('ab-social');
+  const luck   = getAbility('ab-luck');
+  const hp = body + 10;
+  const mp = mind + intel;
+
+  const emOmote = document.getElementById('em-omote').value || '不安（情念）';
+  const emUra   = document.getElementById('em-ura').value   || '孤独（傷）';
+  const emRoots = document.getElementById('em-roots').value || '好奇心（欲望）';
+
+  const scenario = document.getElementById('scenario-type').value;
+  const dlStyle  = document.getElementById('dl-style').value;
+
+  const scenarioMap = {
+    mystery:       '日常に潜む怪奇事件・都市の闇に関わる謎',
+    horror:        '恐怖と逃走・生存をかけたサバイバル',
+    investigation: '失踪・死亡事件の真相を追う調査',
+    encounter:     '《怪異》との運命的な邂逅と交渉',
+    urban:         '都市伝説の核心に近づく探索',
+  };
+  const styleMap = {
+    mystery:  'ミステリアス：情報を小出しにし、謎を積み重ねる語り口。',
+    horror:   '恐怖重視：描写に緊迫感と不安を常に漂わせ、間合いを活用する。',
+    dramatic: 'ドラマチック：感情の起伏を豊かに、感情移入を促す演劇的語り口。',
+    serious:  'シリアス：重厚で詩的。世界の残酷さと美しさを淡々と描く。',
+  };
+
+  return `あなたはTRPG「エモクロア」のディーラー（DL）です。日本語で応答してください。
+
+【エモクロアとは】
+現代日本に似た世界を舞台とするTRPGです。「《怪異》」と呼ばれる超常存在が人間社会に存在し、彼らは人間の感情を変異させる力（エモクロア）を持っています。プレイヤーはその影響を受けた「共鳴者」を演じます。
+
+【シナリオタイプ】${scenarioMap[scenario]}
+【DLスタイル】${styleMap[dlStyle]}
+
+【共鳴者データ】
+- 名前：${name}（${age}・${cls}）
+- 外見：${app}
+- 背景：${bg}
+- 能力値：身体${body} / 器用${dex} / 精神${mind} / 五感${sense} / 知力${intel} / 魅力${charm} / 社会${social} / 運勢${luck}
+- HP：${hp} / MP：${mp}
+- 〈∞共鳴〉：Lv.${kyoumeiLevel}（Lv.10で【逸脱】→ロスト）
+- 共鳴感情：表「${emOmote}」/ 裏「${emUra}」/ ルーツ「${emRoots}」
+- 取得技能：${(()=>{
+    const list=[];
+    for(const cat of SKILL_DATA) for(const s of cat.skills){
+      const lv=getSkillLevel(s.id);
+      if(lv>0){
+        let nm=s.name;
+        if(s.custom&&skillCustoms[s.id]) nm+=`：${skillCustoms[s.id]}`;
+        list.push(`〈${nm}〉Lv${lv}`);
+      }
+    }
+    return list.length>0?list.join(' / '):'（基本技能のみ）';
+  })()}
+
+【重要ルール（DLとして把握）】
+■ 判定：技能レベル個のD10を振り、判定値以下の数が成功数。
+  成功度：ファンブル（負）/ 失敗（0）/ シングル（1）/ ダブル（2）/ トリプル（3）/ ミラクル（4〜9）/ カタストロフ（10+）
+  出目1（クリティカル）は成功数+1、出目10（エラー）は成功数-1
+■ 共鳴判定：《怪異》に接触時に実施。成功で物語が進展するが〈∞共鳴〉レベルが上昇。
+  感情マッチング：共鳴者の感情と《怪異》の感情が一致すると有利。
+  トリプル以上でハウリング発動（精神的・身体的変容）
+■ 逸脱：〈∞共鳴〉がLv.10に達すると共鳴者は《怪異》に飲み込まれロスト。
+
+【DLとしての行動指針】
+- 現代日本の日常描写と《怪異》の超常的な恐怖・神秘を対比させる
+- プレイヤーの行動に世界観に沿った結果をフィードバックする
+- 判定が必要な場面では「〈技能名〉で判定してください」と告げる
+- 判定結果が提示された場合（シングル/ダブル等）は、その成功度に応じた描写をする
+- 〈∞共鳴〉が上昇する場面では必ずその旨を伝える（例：「∞共鳴がLv.Xに上昇します」）
+- 物語を一方的に進めず、常に選択肢と行動の余地を残す
+- 応答は250〜400文字程度を目安に、テンポよく進行する
+- 《怪異》は即座に害をなす存在とは限らない。謎めいた・悲しい・美しい側面も描く
+
+まず共鳴者の背景とシナリオタイプに基づいた冒頭シーンを描写し、セッションを開始してください。`;
+}
+
+// ─── API ────────────────────────────────────
+async function generateOpening(apiKey) {
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: sessionSystemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: 'セッションを開始してください。冒頭シーンを描写してください。' }] }],
+      generationConfig: { maxOutputTokens: 700 }
+    })
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.candidates[0].content.parts[0].text;
+}
+
+async function sendMessage(apiKey, userText) {
+  conversationHistory.push({ role: 'user', parts: [{ text: userText }] });
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: sessionSystemPrompt }] },
+      contents: conversationHistory,
+      generationConfig: { maxOutputTokens: 600 }
+    })
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message);
+  const replyText = data.candidates[0].content.parts[0].text;
+  conversationHistory.push({ role: 'model', parts: [{ text: replyText }] });
+
+  // ∞共鳴レベル上昇を検出
+  const kyoumeiMatch = replyText.match(/[∞∞共鳴].*?Lv[\.．]?(\d+)/);
+  if (kyoumeiMatch) {
+    const newLevel = parseInt(kyoumeiMatch[1]);
+    if (newLevel > kyoumeiLevel && newLevel <= 10) {
+      kyoumeiLevel = newLevel;
+      updateSessionStats();
+    }
+  }
+
+  return replyText;
+}
+
+async function speakText(apiKey, text) {
+  try {
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } }
+        }
+      })
+    });
+    const data = await resp.json();
+    if (data.error || !data.candidates) return;
+    const audioData = data.candidates[0]?.content?.parts[0]?.inlineData?.data;
+    if (!audioData) return;
+    const bytes = new Uint8Array(atob(audioData).split('').map(c => c.charCodeAt(0)));
+    const audio = new Audio(URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' })));
+    audio.play();
+  } catch (e) { console.warn('TTS error:', e); }
+}
+
+// ─── 音声認識 ────────────────────────────────
+function startRecognition(apiKey) {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    setStatus('音声認識非対応。テキスト入力をお使いください。', 'error');
+    showTextInput(apiKey);
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SR();
+  recognition.lang = 'ja-JP';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  const btn = document.getElementById('voice-btn');
+  const hint = document.getElementById('voice-hint');
+  btn.classList.add('recording');
+  hint.textContent = '聞いています...';
+
+  recognition.onresult = async (e) => {
+    const text = e.results[0][0].transcript;
+    addLog('You', text);
+    btn.classList.remove('recording');
+    hint.textContent = 'ボタンを押して話す';
+    addThinkingEntry();
+    setStatus('ディーラーが応答を考えています...', 'active');
+    try {
+      const reply = await sendMessage(apiKey, text);
+      removeThinkingEntry();
+      addLog('DL', reply);
+      setStatus('');
+      await speakText(apiKey, reply);
+    } catch (err) {
+      removeThinkingEntry();
+      setStatus('エラー: ' + err.message, 'error');
+    }
+  };
+  recognition.onerror = (e) => {
+    btn.classList.remove('recording');
+    hint.textContent = 'ボタンを押して話す';
+    if (e.error !== 'no-speech') setStatus('音声認識エラー: ' + e.error, 'error');
+  };
+  recognition.onend = () => {
+    btn.classList.remove('recording');
+    hint.textContent = 'ボタンを押して話す';
+  };
+  recognition.start();
+  window._recognition = recognition;
+}
+
+function toggleVoice() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  if (!apiKey) { setStatus('APIキーを入力してください', 'error'); return; }
+  if (!sessionActive) return;
+  startRecognition(apiKey);
+}
+
+function showTextInput(apiKey) {
+  const area = document.getElementById('voice-area');
+  if (document.getElementById('text-input-row')) return;
+  const row = document.createElement('div');
+  row.id = 'text-input-row';
+  row.style.cssText = 'display:flex;gap:10px;width:100%;';
+  row.innerHTML = `
+    <input type="text" id="text-input" placeholder="行動・発言を入力..."
+      style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 14px;font-family:'Crimson Text',serif;font-size:15px;border-radius:2px;outline:none;" />
+    <button class="btn btn-primary" onclick="sendTextInput()">送る</button>
+  `;
+  area.insertBefore(row, area.querySelector('.controls'));
+  document.getElementById('text-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendTextInput();
+  });
+}
+
+async function sendTextInput() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  const input = document.getElementById('text-input');
+  const text = input.value.trim();
+  if (!text || !apiKey) return;
+  input.value = '';
+  addLog('You', text);
+  addThinkingEntry();
+  setStatus('ディーラーが応答を考えています...', 'active');
+  try {
+    const reply = await sendMessage(apiKey, text);
+    removeThinkingEntry();
+    addLog('DL', reply);
+    setStatus('');
+    await speakText(apiKey, reply);
+  } catch (err) {
+    removeThinkingEntry();
+    setStatus('エラー: ' + err.message, 'error');
+  }
+}
+
+// ─── セッション管理 ─────────────────────────
+async function startSession() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  if (!apiKey) { setStatus('APIキーを入力してください', 'error'); return; }
+
+  // 前回の∞共鳴レベルを引き継ぐ（新規ならlocalStorageになければ1）
+  const savedRaw = localStorage.getItem(SAVE_KEY);
+  if (savedRaw) {
+    const savedData = JSON.parse(savedRaw);
+    kyoumeiLevel = savedData.kyoumei || 1;
+  } else {
+    kyoumeiLevel = 1;
+  }
+  // HP/MP初期化
+  maxHP = currentHP = getAbility('ab-body') + 10;
+  maxMP = currentMP = getAbility('ab-mind') + getAbility('ab-int');
+
+  setStatus('シナリオを生成中...', 'active');
+  document.getElementById('start-btn').disabled = true;
+  sessionSystemPrompt = buildSystemPrompt();
+  conversationHistory = [];
+
+  try {
+    const opening = await generateOpening(apiKey);
+    conversationHistory.push({ role: 'model', parts: [{ text: opening }] });
+
+    // UI切り替え
+    document.getElementById('scenario-box').style.display = 'block';
+    document.getElementById('scenario-text').textContent = opening;
+    document.getElementById('log').style.display = 'flex';
+    document.getElementById('voice-area').style.display = 'flex';
+    document.getElementById('voice-btn').style.display = 'flex';
+    document.getElementById('char-panel').style.display = 'none';
+    document.getElementById('main-controls').style.display = 'none';
+
+    // ステータスバー
+    const statsEl = document.getElementById('session-stats');
+    statsEl.style.display = 'flex';
+    document.getElementById('sess-name').textContent = document.getElementById('char-name').value || '共鳴者';
+    updateSessionStats();
+
+    sessionActive = true;
+    saveCharacter();  // セッション開始時に自動保存
+    setStatus('セッション進行中 — 話しかけるかテキストで行動を入力してください', 'active');
+    await speakText(apiKey, opening);
+    showTextInput(apiKey);
+  } catch (err) {
+    setStatus('エラー: ' + err.message, 'error');
+    document.getElementById('start-btn').disabled = false;
+  }
+}
+
+function endSession() {
+  sessionActive = false;
+  if (window._recognition) window._recognition.abort();
+  // ∞共鳴レベルを含めてセッション終了時に保存
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (raw) {
+    const d = JSON.parse(raw);
+    d.kyoumei = kyoumeiLevel;
+    d.savedAt = new Date().toLocaleDateString('ja-JP');
+    localStorage.setItem(SAVE_KEY, JSON.stringify(d));
+    updateSaveBar(d);
+  }
+
+  document.getElementById('scenario-box').style.display = 'none';
+  document.getElementById('log').style.display = 'none';
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('voice-area').style.display = 'none';
+  document.getElementById('voice-btn').style.display = 'none';
+  document.getElementById('session-stats').style.display = 'none';
+  document.getElementById('dice-panel').style.display = 'none';
+  document.getElementById('char-panel').style.display = 'flex';
+  document.getElementById('main-controls').style.display = 'flex';
+  document.getElementById('start-btn').disabled = false;
+  document.getElementById('dice-result').style.display = 'none';
+
+  conversationHistory = [];
+  const textRow = document.getElementById('text-input-row');
+  if (textRow) textRow.remove();
+  setStatus('セッション終了。またの冒険をお待ちしております。');
+}
+
+// ─── 技能システム ────────────────────────────
+const SKILL_DATA = [
+  { cat: '調査', skills: [
+    { id: 'chosa',    name: '調査',       base: true,  ex: false, ability: '【器用】',             desc: '手がかりや情報を見つけ出し整理する基本技能。現場・物品の調査、証拠収集に使用する。' },
+    { id: 'kensaku',  name: '検索',       base: false, ex: false, ability: '【知力】+Lv',          desc: '多くの情報から目当ての情報を選び取る。ネット・資料・図書館での情報収集。' },
+    { id: 'dosatsu',  name: '洞察',       base: false, ex: false, ability: '【知力】+Lv',          desc: '手がかりから分析・推論して真実を察する。人の嘘や隠し事を見抜くことも。' },
+    { id: 'mapping',  name: 'マッピング', base: false, ex: false, ability: '【器用/五感】+Lv',     desc: '地図読み・位置把握・尾行追跡に使用する。迷宮や建物の構造把握にも。' },
+    { id: 'chokkan',  name: '直感',       base: false, ex: false, ability: '【精神/運勢】+Lv',     desc: '感性やひらめきで答えを出す。論理ではなく第六感で情報を得るシーンに。' },
+    { id: 'kantei',   name: '鑑定',       base: false, ex: false, ability: '【五感/知力】+Lv',     desc: '物品の特徴・素材・価値・真贋を調べる。怪異の遺物や骨董品の鑑定に。' },
+  ]},
+  { cat: '知覚', skills: [
+    { id: 'chikaku',  name: '知覚',       base: true,  ex: false, ability: '【五感】',             desc: '五感で周囲の状況を知る基本技能。異変・隠れた存在・音・臭いの感知に。' },
+    { id: 'kansatsu', name: '観察眼',     base: false, ex: false, ability: '【五感】+Lv',          desc: '隠されたものを発見し違和感に気づく。細部まで見逃さない視覚の技能。' },
+    { id: 'kikimimi', name: '聞き耳',     base: false, ex: false, ability: '【五感】+Lv',          desc: '小さな音や声に気づく聴覚技能。盗み聞き・壁越しの音の察知に。' },
+    { id: 'dokumi',   name: '毒見',       base: false, ex: false, ability: '【五感】+Lv',          desc: 'においや味の違和感に気づく。毒・異物・腐敗などを感じ取る嗅覚・味覚技能。' },
+    { id: 'kiki',     name: '危機察知',   base: false, ex: false, ability: '【五感/運勢】+Lv',     desc: '自身への危険や攻撃を察知する。この技能を持つと回避判定が強化される。' },
+    { id: 'reikan',   name: '霊感',       base: false, ex: true,  ability: '【精神/運勢】+Lv',     desc: '怪異の気配や痕跡を察知するEX技能。《怪異》の存在・感情・目的をより深く感じ取れる。' },
+  ]},
+  { cat: '交渉', skills: [
+    { id: 'kosho',    name: '交渉',       base: true,  ex: false, ability: '【魅力】',             desc: '会話・情報聞き出し・要求を通す基本技能。相手との対話全般に使用する。' },
+    { id: 'shakoju',  name: '社交術',     base: false, ex: false, ability: '【社会】+Lv',          desc: '礼儀・社会的信用・人脈で交渉を有利に進める。フォーマルな場での立ち振る舞い。' },
+    { id: 'debate',   name: 'ディベート', base: false, ex: false, ability: '【知力】+Lv',          desc: '知識・理屈で相手を説得し言いくるめる。論理的な議論や尋問シーンで活躍。' },
+    { id: 'miryou',   name: '魅了',       base: false, ex: false, ability: '【魅力】+Lv',          desc: '美貌やカリスマで相手を魅了する。相手を惹きつけ交渉や情報収集を有利に。' },
+    { id: 'shinri',   name: '心理',       base: false, ex: false, ability: '【精神/知力】+Lv',     desc: '相手の感情を読み取り利用する。人の深層心理・動機・トラウマを分析する。' },
+  ]},
+  { cat: '情報', skills: [
+    { id: 'chishiki', name: '知識',       base: true,  ex: false, ability: '【知力】',             desc: '一般常識・義務教育レベルの知識判定。幅広い分野の基礎知識を参照する。' },
+    { id: 'senmon',   name: '専門知識',   base: false, ex: false, ability: '【知力】+Lv',          desc: '特定分野の専門知識を有する。医学・法律・化学などの専門家として振る舞える。', custom: true, customLabel: '分野名' },
+    { id: 'news',     name: 'ニュース',   base: true,  ex: false, ability: '【社会】',             desc: 'ニュースや時事ネタを知っているか判定する。社会的な話題への精通度。' },
+    { id: 'jijotsu',  name: '事情通',     base: false, ex: false, ability: '【五感/社会】+Lv',     desc: '噂話や裏話に詳しい。地域・業界の非公式な情報網を持ち、隠れた話を知っている。' },
+    { id: 'gyokai',   name: '業界',       base: false, ex: false, ability: '【社会/魅力】+Lv',     desc: '特定業界への人脈と情報を有する。業界名を設定し、その内部事情に精通する。', custom: true, customLabel: '業界名' },
+  ]},
+  { cat: '運動', skills: [
+    { id: 'undo',     name: '運動',       base: true,  ex: false, ability: '【身体】',             desc: '走る・跳ぶ・登る・泳ぐなどの基本的な身体運動。逃走・追跡・障害物突破に。' },
+    { id: 'speed',    name: 'スピード',   base: false, ex: false, ability: '【身体】+Lv',          desc: '俊敏性を競う技能。戦闘イニシアチブが強化され、素早い行動が可能になる。' },
+    { id: 'strngth',  name: 'ストレングス', base: false, ex: false, ability: '【身体】+Lv',        desc: '筋力で重いものを動かす。近接武器使用時の攻撃力が強化される。' },
+    { id: 'acrobat',  name: 'アクロバット', base: false, ex: false, ability: '【身体/器用】+Lv',   desc: '身軽さとバランス感覚。曲芸的な動き、狭い場所での行動、均衡維持に使用する。' },
+    { id: 'dive',     name: 'ダイブ',     base: false, ex: false, ability: '【身体】+Lv',          desc: '水中・雪上・空中など特殊環境での運動。飛び込み、水泳、スキーなどに対応。' },
+    { id: 'kakuto',   name: '格闘',       base: true,  ex: false, ability: '【身体】',             desc: '近接距離での肉体戦闘基本技能。素手・刃物・鈍器など近接攻撃全般に使用。' },
+    { id: 'bujutsu',  name: '武術',       base: false, ex: false, ability: '【身体】+Lv',          desc: '特定の近接戦闘術への習熟。流派・スタイル名を設定し、専門的な戦闘技術を持つ。', custom: true, customLabel: '流派名' },
+    { id: 'ougi',     name: '奥義',       base: false, ex: true,  ability: '【身体/精神/器用】+Lv', desc: '近接戦闘術を極めた強力なEX技能。戦闘に特殊な効果をもたらす必殺技を持つ。', custom: true, customLabel: '技名' },
+    { id: 'touseki',  name: '投擲',       base: true,  ex: false, ability: '【器用】',             desc: '物を狙った場所に投げる基本技能。遠距離への投擲攻撃・アイテム受け渡しに。' },
+    { id: 'shageki',  name: '射撃',       base: false, ex: true,  ability: '【器用/五感】+Lv',     desc: '銃器・弓矢などの遠距離攻撃武器を扱うEX技能。武器の種類を設定する。', custom: true, customLabel: '武器種' },
+  ]},
+  { cat: '生存', skills: [
+    { id: 'seizon',   name: '生存',       base: true,  ex: false, ability: '【身体】',             desc: 'HP0以下の心肺停止状態での生死判定。この技能が高いほど生き残る可能性が上がる。' },
+    { id: 'taikyu',   name: '耐久',       base: false, ex: false, ability: '【身体】+Lv',          desc: '身体的負荷への耐性。戦闘でのダメージを軽減する特殊効果を持つ。' },
+    { id: 'jiga',     name: '自我',       base: true,  ex: false, ability: '【精神】',             desc: 'MP0以下の失神判定・精神的浸食への抵抗。∞共鳴の暴走にも抵抗できる。' },
+    { id: 'konjou',   name: '根性',       base: false, ex: false, ability: '【精神】+Lv',          desc: '精神的タフさ・強い信念。〈自我〉の代用も可能で、追い詰められた状況でも踏ん張る。' },
+    { id: 'teate',    name: '手当て',     base: true,  ex: false, ability: '【知力】÷2',           desc: '傷や意識喪失者への応急手当。HPを少量回復させる基本的な医療行為。' },
+    { id: 'ijutsu',   name: '医術',       base: false, ex: false, ability: '【器用/知力】+Lv',     desc: '医学的専門知識で治療診断を行う。〈手当て〉より大きくHPを回復できる。' },
+    { id: 'sosei',    name: '蘇生',       base: false, ex: true,  ability: '【知力/精神】÷2',      desc: '心肺停止状態の他者を救命するEX技能。失敗するとそのまま死亡してしまう。' },
+  ]},
+  { cat: '特殊', skills: [
+    { id: 'saiku',    name: '細工',       base: true,  ex: false, ability: '【器用】',             desc: '手先を使った作業・工作・修理の基本技能。鍵の解錠、罠の作製、機器の修理に。' },
+    { id: 'giko',     name: '技巧',       base: false, ex: false, ability: '【器用】+Lv',          desc: '高度で専門的な技術を習得。技術名を設定し、職人的な技術を発揮する。', custom: true, customLabel: '技術名' },
+    { id: 'geijutsu', name: '芸術',       base: false, ex: false, ability: '【器用/精神/五感】+Lv', desc: '芸術活動と感性の表現。ジャンルを設定し、演奏・絵画・演技などで人の心を動かす。', custom: true, customLabel: 'ジャンル' },
+    { id: 'sojuu',    name: '操縦',       base: false, ex: false, ability: '【器用/五感/知力】+Lv', desc: '乗り物や機械の操縦。乗り物の種類を設定し、車・バイク・船などを操る。', custom: true, customLabel: '乗り物種' },
+    { id: 'angou',    name: '暗号',       base: false, ex: false, ability: '【知力】+Lv',          desc: '暗号の作成と解読。暗号文の解読、通信の傍受・隠蔽、秘密のメッセージ作成に。' },
+    { id: 'denno',    name: '電脳',       base: false, ex: false, ability: '【知力】+Lv',          desc: 'コンピューターの専門操作。ハッキング・データ解析・システム侵入などに使用する。' },
+    { id: 'inpei',    name: '隠匿',       base: false, ex: false, ability: '【器用/社会/運勢】+Lv', desc: '人やモノを隠したり隠れたりする。尾行・気配を消す・証拠隠滅などに使用する。' },
+    { id: 'kouun',    name: '幸運',       base: true,  ex: false, ability: '【運勢】',             desc: '偶然により有利な状況を得る基本技能。運任せの判定や幸運なタイミングに使用。' },
+    { id: 'kyouun',   name: '強運',       base: false, ex: true,  ability: '【運勢】+Lv',          desc: '強い天運を持つEX技能。一般的な幸運では説明できない、奇跡的な運を発揮する。' },
+  ]},
+];
+
+let skillLevels = {};
+let skillCustoms = {};
+
+function findSkill(id) {
+  for (const cat of SKILL_DATA) for (const s of cat.skills) if (s.id === id) return s;
+  return null;
+}
+function getSkillLevel(id) {
+  const skill = findSkill(id);
+  if (!skill) return 0;
+  return skillLevels[id] !== undefined ? skillLevels[id] : (skill.base ? 1 : 0);
+}
+function skillPointCost(skill, level) {
+  if (level === 0) return 0;
+  if (skill.base && level === 1) return 0;
+  const costs = [0, 1, 5, 15];
+  return costs[level] * (skill.ex ? 2 : 1);
+}
+function calcTotalSpentPoints() {
+  let total = 0;
+  for (const cat of SKILL_DATA)
+    for (const s of cat.skills) total += skillPointCost(s, getSkillLevel(s.id));
+  return total;
+}
+function updateSkillPointsDisplay() {
+  const spent = calcTotalSpentPoints();
+  const left  = 30 - spent;
+  const el = document.getElementById('skill-pts-left');
+  if (!el) return;
+  el.textContent = left;
+  el.className = 'skill-pts-num ' + (left < 0 ? 'warn' : 'ok');
+  document.getElementById('skill-pts-spent').textContent = spent;
+}
+
+function setSkillLevel(id, level) {
+  const skill = findSkill(id); if (!skill) return;
+  const minLv  = skill.base ? 1 : 0;
+  const curLv  = getSkillLevel(id);
+  const newLv  = (curLv === level && level > minLv) ? minLv : level;
+  if (curLv === newLv) return;
+  const delta = skillPointCost(skill, newLv) - skillPointCost(skill, curLv);
+  if (delta > 0 && calcTotalSpentPoints() + delta > 30) {
+    setStatus('技能ポイントが足りません！', 'error'); return;
+  }
+  skillLevels[id] = newLv;
+  renderSkillRow(id);
+  updateSkillPointsDisplay();
+}
+
+function renderSkillRow(id) {
+  const skill = findSkill(id); if (!skill) return;
+  const lv   = getSkillLevel(id);
+  const minLv = skill.base ? 1 : 0;
+  for (let i = 0; i <= 3; i++) {
+    const btn = document.getElementById(`slb-${id}-${i}`);
+    if (!btn) continue;
+    btn.classList.toggle('active', lv === i);
+    btn.disabled = i < minLv;
+  }
+  const costEl = document.getElementById(`scost-${id}`);
+  if (costEl) {
+    const cost = skillPointCost(skill, lv);
+    costEl.textContent = cost > 0 ? cost + 'pt' : (skill.base && lv === 1 ? '＊' : '—');
+    costEl.style.color = cost > 0 ? 'var(--purple)' : 'var(--text-dim)';
+  }
+  const row = document.getElementById(`srow-${id}`);
+  if (row) row.classList.toggle('inactive', lv === 0);
+}
+
+function renderSkillsTab() {
+  const container = document.getElementById('skill-list-container');
+  if (!container) return;
+  let html = '';
+  for (const catData of SKILL_DATA) {
+    html += `<div class="skill-cat-block"><div class="skill-cat-title">${catData.cat}</div><div class="skill-grid">`;
+    for (const s of catData.skills) {
+      const lv   = getSkillLevel(s.id);
+      const minLv = s.base ? 1 : 0;
+      const cost = skillPointCost(s, lv);
+      const costTxt = cost > 0 ? cost + 'pt' : (s.base && lv === 1 ? '＊' : '—');
+      html += `<div class="skill-row ${lv===0?'inactive':''}" id="srow-${s.id}"
+        onmouseenter="showSkillTooltip(event,'${s.id}')"
+        onmouseleave="hideSkillTooltip()"
+        onmousemove="moveSkillTooltip(event)">`;
+      // 技能名
+      html += `<span class="skill-name">${s.name}`;
+      if (s.custom) {
+        const cv = (skillCustoms[s.id] || '');
+        html += `<input type="text" class="skill-custom-input" id="scustom-${s.id}"
+          placeholder="${s.customLabel}" value="${cv}"
+          onclick="event.stopPropagation()"
+          oninput="skillCustoms['${s.id}']=this.value" />`;
+      }
+      html += `</span>`;
+      if (s.base) html += `<span class="skill-tag base">＊</span>`;
+      if (s.ex)   html += `<span class="skill-tag ex">★</span>`;
+      // レベルボタン
+      html += `<div class="skill-lv-group">`;
+      for (let i = 0; i <= 3; i++) {
+        const lbl = i === 0 ? '—' : `L${i}`;
+        html += `<button class="skill-lv-btn ${lv===i?'active':''}" id="slb-${s.id}-${i}"
+          ${i<minLv?'disabled':''} onclick="setSkillLevel('${s.id}',${i})">${lbl}</button>`;
+      }
+      html += `</div>`;
+      html += `<span class="skill-cost-label" id="scost-${s.id}"
+        style="color:${cost>0?'var(--purple)':'var(--text-dim)'}">${costTxt}</span>`;
+      html += `</div>`;
+    }
+    html += `</div></div>`;
+  }
+  container.innerHTML = html;
+  updateSkillPointsDisplay();
+}
+
+// ツールチップ
+function showSkillTooltip(event, id) {
+  const s = findSkill(id); if (!s) return;
+  const customSuffix = (s.custom && skillCustoms[id]) ? `：${skillCustoms[id]}` : '';
+  document.getElementById('tt-name').textContent    = `〈${s.name}${customSuffix}〉`;
+  document.getElementById('tt-ability').textContent = `判定値：${s.ability}`;
+  document.getElementById('tt-desc').textContent    = s.desc;
+  const costs = s.ex     ? 'Lv1: 2pt ／ Lv2: 10pt ／ Lv3: 30pt（EX×2）'
+              : s.base   ? 'Lv1: 無料（ベース技能） ／ Lv2: 5pt ／ Lv3: 15pt'
+                         : 'Lv1: 1pt ／ Lv2: 5pt ／ Lv3: 15pt';
+  document.getElementById('tt-cost').textContent = costs;
+  const tt = document.getElementById('skill-tooltip');
+  tt.style.display = 'block';
+  positionTooltip(event, tt);
+}
+function hideSkillTooltip() {
+  document.getElementById('skill-tooltip').style.display = 'none';
+}
+function moveSkillTooltip(event) {
+  const tt = document.getElementById('skill-tooltip');
+  if (tt.style.display !== 'none') positionTooltip(event, tt);
+}
+function positionTooltip(event, tt) {
+  const m = 16, w = tt.offsetWidth || 260, h = tt.offsetHeight || 120;
+  let x = event.clientX + m, y = event.clientY + m;
+  if (x + w > window.innerWidth  - 8) x = event.clientX - w - m;
+  if (y + h > window.innerHeight - 8) y = event.clientY - h - m;
+  tt.style.left = x + 'px';
+  tt.style.top  = y + 'px';
+}
+
+// ─── キャラクター保存・読み込み ──────────────
+const SAVE_KEY = 'emoklore_character';
+
+function saveCharacter() {
+  const data = {
+    name:       document.getElementById('char-name').value,
+    age:        document.getElementById('char-age').value,
+    cls:        document.getElementById('char-class').value,
+    appearance: document.getElementById('char-appearance').value,
+    bg:         document.getElementById('char-bg').value,
+    body:       document.getElementById('ab-body').value,
+    dex:        document.getElementById('ab-dex').value,
+    mind:       document.getElementById('ab-mind').value,
+    sense:      document.getElementById('ab-sense').value,
+    int:        document.getElementById('ab-int').value,
+    charm:      document.getElementById('ab-charm').value,
+    social:     document.getElementById('ab-social').value,
+    luck:       document.getElementById('ab-luck').value,
+    emOmote:    document.getElementById('em-omote').value,
+    emUra:      document.getElementById('em-ura').value,
+    emRoots:    document.getElementById('em-roots').value,
+    scenario:   document.getElementById('scenario-type').value,
+    dlStyle:    document.getElementById('dl-style').value,
+    kyoumei:      kyoumeiLevel,
+    skillLevels:  { ...skillLevels },
+    skillCustoms: { ...skillCustoms },
+    savedAt:      new Date().toLocaleDateString('ja-JP'),
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  updateSaveBar(data);
+  setStatus(`「${data.name || '共鳴者'}」のデータを保存しました。`);
+}
+
+function loadCharacter() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) return;
+  const d = JSON.parse(raw);
+  document.getElementById('char-name').value       = d.name || '';
+  document.getElementById('char-age').value        = d.age  || '';
+  document.getElementById('char-class').value      = d.cls  || '';
+  document.getElementById('char-appearance').value = d.appearance || '';
+  document.getElementById('char-bg').value         = d.bg   || '';
+  document.getElementById('ab-body').value   = d.body   ?? 3;
+  document.getElementById('ab-dex').value    = d.dex    ?? 3;
+  document.getElementById('ab-mind').value   = d.mind   ?? 3;
+  document.getElementById('ab-sense').value  = d.sense  ?? 3;
+  document.getElementById('ab-int').value    = d.int    ?? 3;
+  document.getElementById('ab-charm').value  = d.charm  ?? 3;
+  document.getElementById('ab-social').value = d.social ?? 3;
+  document.getElementById('ab-luck').value   = d.luck   ?? 3;
+  if (d.emOmote) document.getElementById('em-omote').value = d.emOmote;
+  if (d.emUra)   document.getElementById('em-ura').value   = d.emUra;
+  if (d.emRoots) document.getElementById('em-roots').value = d.emRoots;
+  if (d.scenario) document.getElementById('scenario-type').value = d.scenario;
+  if (d.dlStyle)  document.getElementById('dl-style').value      = d.dlStyle;
+  kyoumeiLevel = d.kyoumei || 1;
+  skillLevels  = d.skillLevels  || {};
+  skillCustoms = d.skillCustoms || {};
+  updateStats();
+  renderSkillsTab();
+  updateSaveBar(d);
+}
+
+function clearCharacter() {
+  if (!confirm('保存済みキャラクターを削除して新規作成しますか？')) return;
+  localStorage.removeItem(SAVE_KEY);
+  kyoumeiLevel = 1;
+  document.getElementById('save-bar').style.display = 'none';
+  // フォームリセット
+  ['char-name','char-age','char-class','char-appearance','char-bg'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  ['ab-body','ab-dex','ab-mind','ab-sense','ab-int','ab-charm','ab-social','ab-luck'].forEach(id => {
+    document.getElementById(id).value = 3;
+  });
+  document.getElementById('em-omote').value = '';
+  document.getElementById('em-ura').value   = '';
+  document.getElementById('em-roots').value = '';
+  skillLevels  = {};
+  skillCustoms = {};
+  updateStats();
+  renderSkillsTab();
+  setStatus('新規キャラクター作成モードです。');
+}
+
+function updateSaveBar(data) {
+  const bar = document.getElementById('save-bar');
+  bar.style.display = 'flex';
+  document.getElementById('save-bar-name').textContent =
+    (data.name || '名無し') + (data.age ? `（${data.age}）` : '') + (data.cls ? ` / ${data.cls}` : '');
+  document.getElementById('save-bar-meta').textContent = `保存日：${data.savedAt || '—'}`;
+  const kLv = data.kyoumei || 1;
+  const kyoEl = document.getElementById('save-bar-kyoumei');
+  kyoEl.textContent = `∞共鳴 Lv.${kLv}`;
+  kyoEl.style.color = kLv >= 8 ? 'var(--red-bright)' : '';
+}
+
+// ─── 初期化 ──────────────────────────────────
+updateStats();
+loadCharacter();        // saveがあればskillLevels復元 → renderSkillsTab()を呼ぶ
+if (!localStorage.getItem(SAVE_KEY)) renderSkillsTab(); // 初回（saveなし）
+</script>
+</body>
+</html>

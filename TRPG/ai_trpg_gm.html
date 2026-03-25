@@ -436,6 +436,18 @@
   .btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
   .btn-teal { background: transparent; border-color: var(--teal); color: var(--teal); }
   .btn-teal:hover { background: rgba(74,154,154,0.1); border-color: var(--teal-bright); color: var(--teal-bright); }
+  .btn-auto { background: transparent; border-color: #6a4a9a; color: #a070d0; }
+  .btn-auto:hover { background: rgba(106,74,154,0.15); border-color: #a070d0; color: #c090f0; }
+  .btn-auto.active {
+    background: rgba(106,74,154,0.25);
+    border-color: var(--purple-bright);
+    color: var(--purple-bright);
+    animation: pulse-auto 2s ease-in-out infinite;
+  }
+  @keyframes pulse-auto {
+    0%, 100% { box-shadow: 0 0 8px rgba(138,111,200,0.3); }
+    50% { box-shadow: 0 0 22px rgba(138,111,200,0.7); }
+  }
   .btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
 
   /* 音声ボタン */
@@ -1236,6 +1248,7 @@
     <div class="voice-hint" id="voice-hint">ボタンを押して話す</div>
     <div class="controls">
       <button class="btn btn-teal" onclick="toggleDicePanel()">ダイス判定</button>
+      <button class="btn btn-auto" id="auto-btn" onclick="toggleAutoMode()">オートモード</button>
       <button class="btn btn-secondary" onclick="endSession()">セッション終了</button>
     </div>
   </div>
@@ -1261,6 +1274,8 @@ let maxHP = 0;
 let currentMP = 0;
 let maxMP = 0;
 let kyoumeiLevel = 1;
+let autoMode = false;
+let autoModeTimer = null;
 
 // ─── UI ヘルパー ─────────────────────────────
 function setStatus(msg, type = '') {
@@ -1532,6 +1547,91 @@ async function speakText(apiKey, text) {
   } catch (e) { console.warn('TTS error:', e); }
 }
 
+// ─── オートモード ────────────────────────────
+async function generatePlayerAction(apiKey) {
+  const name       = document.getElementById('char-name').value || '共鳴者';
+  const bg         = document.getElementById('char-bg').value || '';
+  const emOmote    = document.getElementById('em-omote').value || '';
+  const emUra      = document.getElementById('em-ura').value || '';
+  const appearance = document.getElementById('char-appearance').value || '';
+
+  const playerPrompt = `あなたはTRPG「エモクロア」のプレイヤーです。以下のキャラクターを演じてください。
+
+【キャラクター情報】
+- 名前：${name}
+- 外見：${appearance}
+- 背景：${bg}
+- 共鳴感情（表）：${emOmote}
+- 共鳴感情（裏）：${emUra}
+
+ディーラー（DL）の最新の描写・問いかけに対して、このキャラクターとして自然な行動・発言を1〜2文で返してください。
+キャラクターの一人称視点で、日本語で答えてください。判定が必要な場面ではその技能使用を宣言してください。余計な説明は不要です。`;
+
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: playerPrompt }] },
+      contents: conversationHistory,
+      generationConfig: { maxOutputTokens: 180 }
+    })
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.candidates[0].content.parts[0].text;
+}
+
+async function runAutoTurn(apiKey) {
+  if (!autoMode || !sessionActive) return;
+  try {
+    setStatus('【オート】キャラクターが行動を考えています...', 'active');
+    const playerAction = await generatePlayerAction(apiKey);
+    if (!autoMode || !sessionActive) return;
+
+    addLog('You', '【オート】 ' + playerAction);
+    addThinkingEntry();
+    setStatus('ディーラーが応答を考えています...', 'active');
+
+    const reply = await sendMessage(apiKey, playerAction);
+    removeThinkingEntry();
+    if (!autoMode || !sessionActive) return;
+
+    addLog('DL', reply);
+    setStatus('オートモード進行中 — ボタンで停止', 'active');
+    await speakText(apiKey, reply);
+
+    if (autoMode && sessionActive) {
+      autoModeTimer = setTimeout(() => runAutoTurn(apiKey), 4000);
+    }
+  } catch (err) {
+    removeThinkingEntry();
+    setStatus('オートモードエラー: ' + err.message, 'error');
+    autoMode = false;
+    const btn = document.getElementById('auto-btn');
+    if (btn) { btn.classList.remove('active'); btn.textContent = 'オートモード'; }
+  }
+}
+
+function toggleAutoMode() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  if (!apiKey) { setStatus('APIキーを入力してください', 'error'); return; }
+  if (!sessionActive) { setStatus('セッション中のみ使用できます', 'error'); return; }
+
+  autoMode = !autoMode;
+  const btn = document.getElementById('auto-btn');
+  if (autoMode) {
+    btn.classList.add('active');
+    btn.textContent = 'オート停止';
+    setStatus('オートモード ON — AIがキャラクターを自動操作します', 'active');
+    autoModeTimer = setTimeout(() => runAutoTurn(apiKey), 2000);
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = 'オートモード';
+    if (autoModeTimer) { clearTimeout(autoModeTimer); autoModeTimer = null; }
+    setStatus('オートモード停止');
+  }
+}
+
 // ─── 音声認識 ────────────────────────────────
 function startRecognition(apiKey) {
   if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -1681,6 +1781,10 @@ async function startSession() {
 
 function endSession() {
   sessionActive = false;
+  autoMode = false;
+  if (autoModeTimer) { clearTimeout(autoModeTimer); autoModeTimer = null; }
+  const autoBtn = document.getElementById('auto-btn');
+  if (autoBtn) { autoBtn.classList.remove('active'); autoBtn.textContent = 'オートモード'; }
   if (window._recognition) window._recognition.abort();
   // ∞共鳴レベルを含めてセッション終了時に保存
   const raw = localStorage.getItem(SAVE_KEY);

@@ -1,0 +1,20 @@
+{
+  "name": "TRPG始めました",
+  "short_name": "TRPG始めました",
+  "description": "エモクロアTRPG AI ディーラー — 《怪異》とあなたが織りなす物語",
+  "start_url": "./ai_trpg_gm.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#080810",
+  "theme_color": "#8a6fc8",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>エモクロアTRPG AI ディーラー</title>
+<meta name="theme-color" content="#8a6fc8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TRPG始めました">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -944,22 +951,190 @@
   }
   #bg-toggle:hover { color: var(--purple-bright); border-color: var(--purple-dim); }
   #bg-toggle.generating { color: var(--teal); }
+
+  /* ─── メインメニュー ─────────────────────────── */
+  #menu-screen {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+  }
+  .menu-header {
+    text-align: center;
+    padding: 0 0 48px;
+  }
+  .menu-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-width: 360px;
+  }
+  .menu-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    letter-spacing: 0.22em;
+    padding: 18px 32px;
+    border: 1px solid var(--purple-dim);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.25s;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .menu-btn::before {
+    content: '◈';
+    color: var(--purple-dim);
+    transition: color 0.25s;
+    flex-shrink: 0;
+  }
+  .menu-btn:hover {
+    border-color: var(--purple);
+    color: var(--purple-bright);
+    background: var(--glow);
+    box-shadow: 0 0 28px rgba(138,111,200,0.2);
+  }
+  .menu-btn:hover::before { color: var(--purple); }
+  .menu-btn.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 6px 0;
+  }
+  .menu-version {
+    margin-top: 48px;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    font-style: italic;
+    text-align: center;
+  }
+
+  /* ─── サブ画面（ライブラリー・設定） ─────────── */
+  .sub-screen {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    min-height: 100vh;
+    flex-direction: column;
+    gap: 20px;
+    display: none;
+  }
+  .sub-screen.active { display: flex; }
+  .screen-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .back-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .back-btn:hover { border-color: var(--purple-dim); color: var(--purple); }
+  .screen-title {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    color: var(--purple);
+    letter-spacing: 0.2em;
+  }
+
+  /* ライブラリー */
+  .library-entry {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .library-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .library-tag {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 2px;
+    background: rgba(138,111,200,0.08);
+    border: 1px solid var(--purple-dim);
+    color: var(--purple);
+    letter-spacing: 0.05em;
+  }
+  .library-entry-text {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text-dim);
+    font-style: italic;
+    white-space: pre-wrap;
+  }
+  .library-empty {
+    text-align: center;
+    padding: 64px 0;
+    color: var(--text-dim);
+    font-style: italic;
+    font-size: 15px;
+  }
+
+  @media (max-width: 768px) {
+    .menu-btn { font-size: 12px; padding: 16px 20px; letter-spacing: 0.15em; }
+    .sub-screen { padding: 20px 16px; }
+  }
 </style>
 </head>
 <body>
 <div id="scene-bg"></div>
 <button id="bg-toggle" onclick="toggleBgGeneration()">🖼 背景OFF</button>
-<div class="container">
+
+<!-- ─── メインメニュー画面 ─────────────────────── -->
+<div id="menu-screen">
+  <div class="menu-header">
+    <div class="title">TRPG始めました</div>
+    <div class="subtitle">AI Dealer — 《怪異》とあなたが織りなす物語</div>
+  </div>
+  <nav class="menu-nav">
+    <button class="menu-btn" onclick="menuAction('new')">はじめから</button>
+    <button class="menu-btn" id="menu-btn-continue" onclick="menuAction('continue')">続きから</button>
+    <button class="menu-btn" id="menu-btn-select" onclick="menuAction('select')">キャラクター選択</button>
+    <div class="menu-divider"></div>
+    <button class="menu-btn" onclick="menuAction('library')">ライブラリー</button>
+    <button class="menu-btn" onclick="menuAction('settings')">設定</button>
+  </nav>
+  <div class="menu-version">Powered by Gemini API</div>
+</div>
+
+<!-- ─── ゲーム画面 ──────────────────────────────── -->
+<div class="container" id="game-container" style="display:none;">
   <header>
     <div class="title">TRPG始めました</div>
     <div class="subtitle">AI Dealer — 《怪異》とあなたが織りなす物語</div>
   </header>
-
-  <!-- APIキー -->
-  <div class="setup-panel">
-    <label>🔑 API KEY</label>
-    <input type="password" id="api-key" placeholder="AIza... (Google AI StudioのAPIキー)" />
-  </div>
 
   <!-- セーブバー（保存済みデータがある時に表示） -->
   <div class="save-bar" id="save-bar" style="display:none;">
@@ -1216,6 +1391,7 @@
 
   <!-- 開始ボタン -->
   <div class="controls" id="main-controls">
+    <button class="btn btn-secondary" onclick="showMenu()">◂ メニュー</button>
     <button class="btn btn-teal btn-xs" style="padding:11px 20px; font-size:11px;" onclick="saveCharacter()">◇ 保存</button>
     <button class="btn btn-primary" id="start-btn" onclick="startSession()">◈ セッション開始 ◈</button>
   </div>
@@ -1277,6 +1453,41 @@
   <div id="status"></div>
 </div>
 
+<!-- ─── ライブラリー画面 ─────────────────────── -->
+<div class="sub-screen" id="library-screen">
+  <div class="screen-header">
+    <button class="back-btn" onclick="showMenu()">◂ メニュー</button>
+    <div class="screen-title">ライブラリー</div>
+  </div>
+  <p style="font-size:13px;color:var(--text-dim);font-style:italic;">セッション中に生成された場面描写の記録です。</p>
+  <div id="library-entries"></div>
+</div>
+
+<!-- ─── 設定画面 ──────────────────────────────── -->
+<div class="sub-screen" id="settings-screen">
+  <div class="screen-header">
+    <button class="back-btn" onclick="showMenu()">◂ メニュー</button>
+    <div class="screen-title">設定</div>
+  </div>
+  <div class="character-panel" style="max-width:600px;">
+    <div class="panel-title">API KEY</div>
+    <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px;">
+      <p style="font-size:13px;color:var(--text-dim);line-height:1.7;">
+        Google AI Studio で発行した API キーを入力してください。<br>
+        キーはブラウザのローカルストレージに保存されます。
+      </p>
+      <div class="field-group">
+        <label>API KEY</label>
+        <input type="password" id="api-key" placeholder="AIza... (Google AI StudioのAPIキー)" />
+      </div>
+      <div>
+        <button class="btn btn-primary" onclick="saveApiKey()">保存</button>
+      </div>
+      <div id="settings-status" style="font-size:13px;color:var(--teal);font-style:italic;min-height:20px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- 技能ツールチップ -->
 <div id="skill-tooltip">
   <div class="tt-name" id="tt-name"></div>
@@ -1295,6 +1506,303 @@ let maxHP = 0;
 let currentMP = 0;
 let maxMP = 0;
 let kyoumeiLevel = 1;
+
+// ─── 定数（画面遷移で使うため先頭に定義） ────────
+const SAVE_KEY = 'emoklore_character';
+const API_KEY_STORE = 'emokroa_api_key';
+
+// ─── IndexedDB ───────────────────────────────
+const DB_NAME = 'trpg-emokroa';
+const DB_VERSION = 1;
+let _db = null;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    if (_db) { resolve(_db); return; }
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('characters')) {
+        d.createObjectStore('characters', { keyPath: 'id' });
+      }
+      if (!d.objectStoreNames.contains('sessions')) {
+        const ss = d.createObjectStore('sessions', { keyPath: 'id', autoIncrement: true });
+        ss.createIndex('lastSavedAt', 'lastSavedAt');
+        ss.createIndex('isComplete', 'isComplete');
+      }
+    };
+    req.onsuccess = e => { _db = e.target.result; resolve(_db); };
+    req.onerror = e => { console.warn('IndexedDB open failed:', e); reject(e); };
+  });
+}
+function dbGet(store, key) {
+  return openDB().then(d => new Promise((resolve, reject) => {
+    const req = d.transaction(store, 'readonly').objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = reject;
+  }));
+}
+function dbPut(store, value) {
+  return openDB().then(d => new Promise((resolve, reject) => {
+    const req = d.transaction(store, 'readwrite').objectStore(store).put(value);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = reject;
+  }));
+}
+function dbGetAll(store) {
+  return openDB().then(d => new Promise((resolve, reject) => {
+    const req = d.transaction(store, 'readonly').objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = reject;
+  }));
+}
+function dbDelete(store, key) {
+  return openDB().then(d => new Promise((resolve, reject) => {
+    const req = d.transaction(store, 'readwrite').objectStore(store).delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = reject;
+  }));
+}
+
+// ─── セッション管理 ──────────────────────────
+let currentSessionId = null;
+let sessionLogEntries = [];
+let _sessionStartedAt = null;
+
+async function saveSession(isComplete = false) {
+  try {
+    const charName = document.getElementById('char-name').value || '共鳴者';
+    const now = new Date().toISOString();
+    const data = {
+      characterName: charName,
+      startedAt: _sessionStartedAt || now,
+      lastSavedAt: now,
+      kyoumeiLevel,
+      currentHP, currentMP, maxHP, maxMP,
+      conversationHistory: [...conversationHistory],
+      systemPrompt: sessionSystemPrompt,
+      logEntries: [...sessionLogEntries],
+      isComplete,
+    };
+    if (currentSessionId !== null) data.id = currentSessionId;
+    const newId = await dbPut('sessions', data);
+    if (currentSessionId === null) currentSessionId = newId;
+  } catch(e) { console.warn('Session save failed:', e); }
+}
+
+function applyCharacterData(d) {
+  document.getElementById('char-name').value       = d.name || '';
+  document.getElementById('char-age').value        = d.age  || '';
+  document.getElementById('char-class').value      = d.cls  || '';
+  document.getElementById('char-appearance').value = d.appearance || '';
+  document.getElementById('char-bg').value         = d.bg   || '';
+  document.getElementById('ab-body').value   = d.body   ?? 3;
+  document.getElementById('ab-dex').value    = d.dex    ?? 3;
+  document.getElementById('ab-mind').value   = d.mind   ?? 3;
+  document.getElementById('ab-sense').value  = d.sense  ?? 3;
+  document.getElementById('ab-int').value    = d.int    ?? 3;
+  document.getElementById('ab-charm').value  = d.charm  ?? 3;
+  document.getElementById('ab-social').value = d.social ?? 3;
+  document.getElementById('ab-luck').value   = d.luck   ?? 3;
+  if (d.emOmote) document.getElementById('em-omote').value = d.emOmote;
+  if (d.emUra)   document.getElementById('em-ura').value   = d.emUra;
+  if (d.emRoots) document.getElementById('em-roots').value = d.emRoots;
+  if (d.scenario) document.getElementById('scenario-type').value = d.scenario;
+  if (d.dlStyle)  document.getElementById('dl-style').value      = d.dlStyle;
+  kyoumeiLevel = d.kyoumei || 1;
+  skillLevels  = d.skillLevels  || {};
+  skillCustoms = d.skillCustoms || {};
+  updateStats();
+  renderSkillsTab();
+  updateSaveBar(d);
+}
+
+async function resumeSession(sess) {
+  conversationHistory = sess.conversationHistory || [];
+  sessionSystemPrompt = sess.systemPrompt || '';
+  kyoumeiLevel  = sess.kyoumeiLevel || 1;
+  currentHP     = sess.currentHP || 0;
+  maxHP         = sess.maxHP || 0;
+  currentMP     = sess.currentMP || 0;
+  maxMP         = sess.maxMP || 0;
+  currentSessionId   = sess.id;
+  _sessionStartedAt  = sess.startedAt;
+  sessionLogEntries  = sess.logEntries || [];
+
+  // ログを再描画
+  const logEl = document.getElementById('log');
+  logEl.innerHTML = '';
+  for (const e of sessionLogEntries) {
+    const speakerClass = e.cls || (e.speaker === 'DL' ? 'dl' : e.speaker === 'You' ? 'player' : 'system');
+    const div = document.createElement('div');
+    div.className = `log-entry ${speakerClass}`;
+    div.innerHTML = `<div class="log-speaker ${speakerClass}">${e.speaker}</div><div class="log-text">${e.text}</div>`;
+    logEl.appendChild(div);
+  }
+
+  // UI 復元（セッション中画面）
+  const openingText = conversationHistory[0]?.parts[0]?.text || '';
+  document.getElementById('scenario-box').style.display = 'block';
+  document.getElementById('scenario-text').textContent = openingText;
+  document.getElementById('log').style.display = 'flex';
+  document.getElementById('voice-area').style.display = 'flex';
+  document.getElementById('voice-btn').style.display = 'flex';
+  document.getElementById('char-panel').style.display = 'none';
+  document.getElementById('main-controls').style.display = 'none';
+  const statsEl = document.getElementById('session-stats');
+  statsEl.style.display = 'flex';
+  document.getElementById('sess-name').textContent = sess.characterName || '共鳴者';
+  updateSessionStats();
+
+  sessionActive = true;
+  document.body.classList.add('session-active');
+  document.getElementById('bg-toggle').style.display = 'block';
+  bgGenerationEnabled = true;
+  document.getElementById('bg-toggle').textContent = '🖼 背景ON';
+  setStatus('セッションを再開しました。', 'active');
+
+  const apiKey = document.getElementById('api-key').value.trim();
+  showTextInput(apiKey);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ─── 画面遷移 ────────────────────────────────
+function showMenu() {
+  document.getElementById('menu-screen').style.display = 'flex';
+  document.getElementById('game-container').style.display = 'none';
+  document.getElementById('library-screen').classList.remove('active');
+  document.getElementById('settings-screen').classList.remove('active');
+  // 続きから・キャラクター選択はセーブデータがある時のみ有効
+  const hasSave = !!localStorage.getItem(SAVE_KEY);
+  document.getElementById('menu-btn-continue').classList.toggle('disabled', !hasSave);
+  document.getElementById('menu-btn-select').classList.toggle('disabled', !hasSave);
+}
+
+async function menuAction(action) {
+  const hasSave = !!localStorage.getItem(SAVE_KEY);
+  document.getElementById('menu-screen').style.display = 'none';
+
+  if (action === 'new') {
+    document.getElementById('game-container').style.display = 'flex';
+    clearCharacterSilent();
+    document.getElementById('char-panel').style.display = 'flex';
+    document.getElementById('main-controls').style.display = 'flex';
+    setStatus('新規キャラクターを作成してください。');
+
+  } else if (action === 'continue') {
+    // IndexedDBから未完了セッションを検索
+    try {
+      const sessions = await dbGetAll('sessions');
+      const incomplete = sessions
+        .filter(s => !s.isComplete)
+        .sort((a, b) => new Date(b.lastSavedAt) - new Date(a.lastSavedAt));
+      if (incomplete.length > 0) {
+        document.getElementById('game-container').style.display = 'flex';
+        await resumeSession(incomplete[0]);
+        return;
+      }
+    } catch(e) { console.warn('Session lookup failed:', e); }
+    // 未完了セッションなし → キャラ選択へ
+    if (!hasSave) { showMenu(); return; }
+    document.getElementById('game-container').style.display = 'flex';
+    loadCharacter();
+    document.getElementById('char-panel').style.display = 'flex';
+    document.getElementById('main-controls').style.display = 'flex';
+    setStatus('中断中のセッションはありません。新しいシナリオを開始してください。');
+
+  } else if (action === 'select') {
+    if (!hasSave) { showMenu(); return; }
+    document.getElementById('game-container').style.display = 'flex';
+    loadCharacter();
+    document.getElementById('char-panel').style.display = 'flex';
+    document.getElementById('main-controls').style.display = 'flex';
+    setStatus('キャラクターを確認し、シナリオ設定を調整してからセッション開始してください。');
+
+  } else if (action === 'library') {
+    await renderLibrary();
+    document.getElementById('library-screen').classList.add('active');
+
+  } else if (action === 'settings') {
+    const saved = localStorage.getItem(API_KEY_STORE) || '';
+    document.getElementById('api-key').value = saved;
+    document.getElementById('settings-screen').classList.add('active');
+  }
+}
+
+function saveApiKey() {
+  const key = document.getElementById('api-key').value.trim();
+  if (key) {
+    localStorage.setItem(API_KEY_STORE, key);
+    const el = document.getElementById('settings-status');
+    el.textContent = 'APIキーを保存しました。';
+    setTimeout(() => { if (el) el.textContent = ''; }, 3000);
+  }
+}
+
+function clearCharacterSilent() {
+  localStorage.removeItem(SAVE_KEY);
+  kyoumeiLevel = 1;
+  document.getElementById('save-bar').style.display = 'none';
+  ['char-name','char-age','char-class','char-appearance','char-bg'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  ['ab-body','ab-dex','ab-mind','ab-sense','ab-int','ab-charm','ab-social','ab-luck'].forEach(id => {
+    document.getElementById(id).value = 3;
+  });
+  document.getElementById('em-omote').value = '';
+  document.getElementById('em-ura').value = '';
+  document.getElementById('em-roots').value = '';
+  skillLevels = {};
+  skillCustoms = {};
+  updateStats();
+  renderSkillsTab();
+}
+
+async function renderLibrary() {
+  const container = document.getElementById('library-entries');
+  if (!container) return;
+  container.innerHTML = '<div class="library-empty">読み込み中...</div>';
+
+  let sessions = [];
+  try { sessions = await dbGetAll('sessions'); } catch(e) { console.warn(e); }
+  sessions.sort((a, b) => new Date(b.lastSavedAt) - new Date(a.lastSavedAt));
+
+  if (sessions.length === 0) {
+    container.innerHTML = '<div class="library-empty">まだ記録はありません。<br>セッションを行うとここにログが保存されます。</div>';
+    return;
+  }
+
+  container.innerHTML = sessions.map(sess => {
+    const date = new Date(sess.lastSavedAt).toLocaleString('ja-JP');
+    const status = sess.isComplete ? '完了' : '中断中';
+    const statusColor = sess.isComplete ? 'var(--teal)' : 'var(--purple)';
+    const logHtml = (sess.logEntries || []).map(e => {
+      const cls = e.cls || 'system';
+      return `<div class="log-entry ${cls}" style="animation:none;">
+        <div class="log-speaker ${cls}">${e.speaker}</div>
+        <div class="log-text">${e.text}</div>
+      </div>`;
+    }).join('');
+    return `<div class="library-entry">
+      <div class="library-tags" style="justify-content:space-between;align-items:center;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span style="font-family:'Cinzel',serif;font-size:13px;color:var(--text);">${sess.characterName || '共鳴者'}</span>
+          <span class="library-tag" style="border-color:${statusColor};color:${statusColor};">${status}</span>
+          <span class="library-tag">∞共鳴 Lv.${sess.kyoumeiLevel || 1}</span>
+        </div>
+        <span style="font-size:11px;color:var(--text-dim);">${date}</span>
+      </div>
+      <details style="margin-top:8px;">
+        <summary style="font-size:12px;color:var(--purple-dim);cursor:pointer;letter-spacing:0.1em;font-family:'Cinzel',serif;">
+          会話ログを表示（${(sess.logEntries||[]).length}件）
+        </summary>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;max-height:480px;overflow-y:auto;padding-right:4px;">
+          ${logHtml || '<div style="color:var(--text-dim);font-style:italic;font-size:13px;">ログなし</div>'}
+        </div>
+      </details>
+    </div>`;
+  }).join('');
+}
 
 // ─── シーン背景 ──────────────────────────────
 const BG_CACHE_KEY = 'emokroa_scene_backgrounds';
@@ -1471,6 +1979,8 @@ function addLog(speaker, text, cls = '') {
   `;
   log.appendChild(entry);
   log.scrollTop = log.scrollHeight;
+  // セッションログに記録
+  sessionLogEntries.push({ speaker, text, cls: speakerClass });
 }
 
 function addThinkingEntry() {
@@ -1694,6 +2204,7 @@ async function sendMessage(apiKey, userText) {
   if (data.error) throw new Error(data.error.message);
   const replyText = data.candidates[0].content.parts[0].text;
   conversationHistory.push({ role: 'model', parts: [{ text: replyText }] });
+  saveSession(); // 各メッセージ後にオートセーブ
 
   // ∞共鳴レベル上昇を検出
   const kyoumeiMatch = replyText.match(/[∞∞共鳴].*?Lv[\.．]?(\d+)/);
@@ -1832,7 +2343,7 @@ async function sendTextInput() {
 // ─── セッション管理 ─────────────────────────
 async function startSession() {
   const apiKey = document.getElementById('api-key').value.trim();
-  if (!apiKey) { setStatus('APIキーを入力してください', 'error'); return; }
+  if (!apiKey) { setStatus('APIキーが未設定です。メニュー → 設定 から入力してください。', 'error'); return; }
 
   // 前回の∞共鳴レベルを引き継ぐ（新規ならlocalStorageになければ1）
   const savedRaw = localStorage.getItem(SAVE_KEY);
@@ -1850,6 +2361,9 @@ async function startSession() {
   document.getElementById('start-btn').disabled = true;
   sessionSystemPrompt = buildSystemPrompt();
   conversationHistory = [];
+  sessionLogEntries = [];
+  currentSessionId = null;
+  _sessionStartedAt = new Date().toISOString();
 
   try {
     const opening = await generateOpening(apiKey);
@@ -1874,6 +2388,7 @@ async function startSession() {
     sessionActive = true;
     document.body.classList.add('session-active');
     saveCharacter();  // セッション開始時に自動保存
+    saveSession();    // IndexedDB にセッション記録を作成
     document.getElementById('bg-toggle').style.display = 'block';
     bgGenerationEnabled = true;
     document.getElementById('bg-toggle').textContent = '🖼 背景ON';
@@ -1890,7 +2405,9 @@ async function startSession() {
 function endSession() {
   sessionActive = false;
   if (window._recognition) window._recognition.abort();
-  // ∞共鳴レベルを含めてセッション終了時に保存
+  // セッションをIndexedDBに完了保存
+  saveSession(true);
+  // ∞共鳴レベルを含めてセッション終了時にlocalStorageにも保存
   const raw = localStorage.getItem(SAVE_KEY);
   if (raw) {
     const d = JSON.parse(raw);
@@ -1918,7 +2435,8 @@ function endSession() {
   conversationHistory = [];
   const textRow = document.getElementById('text-input-row');
   if (textRow) textRow.remove();
-  setStatus('セッション終了。またの冒険をお待ちしております。');
+  setStatus('');
+  setTimeout(showMenu, 600);
 }
 
 // ─── 技能システム ────────────────────────────
@@ -2133,8 +2651,6 @@ function positionTooltip(event, tt) {
 }
 
 // ─── キャラクター保存・読み込み ──────────────
-const SAVE_KEY = 'emoklore_character';
-
 function saveCharacter() {
   const data = {
     name:       document.getElementById('char-name').value,
@@ -2230,11 +2746,35 @@ function updateSaveBar(data) {
 }
 
 // ─── 初期化 ──────────────────────────────────
-updateStats();
-loadCharacter();        // saveがあればskillLevels復元 → renderSkillsTab()を呼ぶ
-if (!localStorage.getItem(SAVE_KEY)) renderSkillsTab(); // 初回（saveなし）
-loadBgCache();
-loadDescriptionCache();
+(async function init() {
+  updateStats();
+  if (!localStorage.getItem(SAVE_KEY)) renderSkillsTab();
+  loadBgCache();
+  loadDescriptionCache();
+  const _savedKey = localStorage.getItem(API_KEY_STORE);
+  if (_savedKey) document.getElementById('api-key').value = _savedKey;
+  // IndexedDB を開いてlocalStorageのキャラデータを移行（初回のみ）
+  try {
+    await openDB();
+    const existingChar = await dbGet('characters', 'main');
+    if (!existingChar && localStorage.getItem(SAVE_KEY)) {
+      const raw = JSON.parse(localStorage.getItem(SAVE_KEY));
+      await dbPut('characters', { ...raw, id: 'main' });
+    }
+  } catch(e) { console.warn('IndexedDB init failed:', e); }
+  showMenu();
+})();
+</script>
+
+<script>
+// ─── Service Worker 登録 ──────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => console.log('SW registered'))
+      .catch(e => console.warn('SW registration failed:', e));
+  });
+}
 </script>
 </body>
 </html>

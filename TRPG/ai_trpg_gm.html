@@ -1474,16 +1474,21 @@
     <div style="display:flex;flex-direction:column;gap:20px;padding-top:8px;">
 
       <!-- 取得手順 -->
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:16px 20px;display:flex;flex-direction:column;gap:12px;">
         <div style="font-family:'Cinzel',serif;font-size:11px;color:var(--purple);letter-spacing:0.15em;">APIキーの取得方法</div>
-        <ol style="font-size:13px;color:var(--text-dim);line-height:1.9;margin:0;padding-left:20px;">
-          <li>ブラウザで <span style="color:var(--teal);font-family:monospace;">aistudio.google.com</span> を開く</li>
+        <ol style="font-size:14px;color:var(--text-dim);line-height:2;margin:0;padding-left:20px;">
+          <li>下のボタンから <strong style="color:var(--text);">Google AI Studio</strong> を開く</li>
           <li>Googleアカウントでログイン</li>
-          <li>左メニューの「<strong style="color:var(--text);">Get API key</strong>」をクリック</li>
-          <li>「<strong style="color:var(--text);">Create API key</strong>」をクリック</li>
-          <li>表示された <span style="color:var(--teal);font-family:monospace;">AIza...</span> から始まるキーをコピー</li>
+          <li>左メニューの「<strong style="color:var(--text);">Get API key</strong>」をタップ</li>
+          <li>「<strong style="color:var(--text);">Create API key</strong>」をタップ</li>
+          <li><span style="color:var(--teal);font-family:monospace;">AIza...</span> から始まるキーをコピー</li>
           <li>下の入力欄に貼り付けて「保存」</li>
         </ol>
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener"
+          style="display:block;text-align:center;padding:14px;border:1px solid var(--teal);border-radius:2px;color:var(--teal-bright);font-family:'Cinzel',serif;font-size:12px;letter-spacing:0.15em;text-decoration:none;transition:background 0.2s;"
+          onmouseover="this.style.background='rgba(74,154,154,0.1)'" onmouseout="this.style.background='transparent'">
+          ◈ Google AI Studio を開く
+        </a>
         <p style="font-size:12px;color:var(--text-dim);font-style:italic;margin:0;">
           ※ APIキーは無料で発行できます（利用量に応じて課金が発生する場合があります）<br>
           ※ キーはこのデバイスのブラウザにのみ保存され、外部には送信されません

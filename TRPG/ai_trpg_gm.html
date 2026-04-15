@@ -912,9 +912,43 @@
     /* ツールチップはモバイルで非表示 */
     #skill-tooltip { display: none !important; }
   }
+  /* シーン背景 */
+  #scene-bg {
+    position: fixed;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transition: opacity 2s ease;
+    z-index: 0;
+    filter: brightness(0.25) saturate(0.6);
+    pointer-events: none;
+  }
+  #scene-bg.visible { opacity: 1; }
+  #bg-toggle {
+    position: fixed;
+    bottom: 14px;
+    right: 14px;
+    z-index: 100;
+    font-size: 10px;
+    padding: 5px 10px;
+    background: rgba(14,14,26,0.85);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: 2px;
+    font-family: 'Cinzel', serif;
+    letter-spacing: 0.08em;
+    display: none;
+  }
+  #bg-toggle:hover { color: var(--purple-bright); border-color: var(--purple-dim); }
+  #bg-toggle.generating { color: var(--teal); }
 </style>
 </head>
 <body>
+<div id="scene-bg"></div>
+<button id="bg-toggle" onclick="toggleBgGeneration()">🖼 背景OFF</button>
 <div class="container">
   <header>
     <div class="title">TRPG始めました</div>
@@ -1262,6 +1296,163 @@ let currentMP = 0;
 let maxMP = 0;
 let kyoumeiLevel = 1;
 
+// ─── シーン背景 ──────────────────────────────
+const BG_CACHE_KEY = 'emokroa_scene_backgrounds';
+const BG_MAX_ENTRIES = 10;
+let sceneBackgroundCache = {};
+let bgGenerationEnabled = true;
+
+function loadBgCache() {
+  try {
+    const raw = localStorage.getItem(BG_CACHE_KEY);
+    if (raw) sceneBackgroundCache = JSON.parse(raw);
+  } catch(e) { sceneBackgroundCache = {}; }
+}
+
+function saveBgCache() {
+  try {
+    const keys = Object.keys(sceneBackgroundCache);
+    if (keys.length > BG_MAX_ENTRIES) {
+      // 古いエントリを削除
+      keys.slice(0, keys.length - BG_MAX_ENTRIES).forEach(k => delete sceneBackgroundCache[k]);
+    }
+    localStorage.setItem(BG_CACHE_KEY, JSON.stringify(sceneBackgroundCache));
+  } catch(e) { console.warn('BG cache save failed:', e); }
+}
+
+function setSceneBackground(dataUrl) {
+  const bg = document.getElementById('scene-bg');
+  bg.style.backgroundImage = `url(${dataUrl})`;
+  bg.classList.add('visible');
+}
+
+function clearSceneBackground() {
+  const bg = document.getElementById('scene-bg');
+  bg.classList.remove('visible');
+  setTimeout(() => { bg.style.backgroundImage = ''; }, 2000);
+}
+
+function toggleBgGeneration() {
+  bgGenerationEnabled = !bgGenerationEnabled;
+  const btn = document.getElementById('bg-toggle');
+  btn.textContent = bgGenerationEnabled ? '🖼 背景ON' : '🖼 背景OFF';
+  if (!bgGenerationEnabled) clearSceneBackground();
+}
+
+async function extractScenePrompt(apiKey, sceneText) {
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: `以下の日本語シーン描写から、背景画像生成用の英語プロンプトを1文で作成してください。場所・雰囲気・照明・時間帯を含めてください。人物は含めないでください。プロンプトのみ返してください:\n\n${sceneText.slice(0, 400)}` }] }],
+      generationConfig: { maxOutputTokens: 80 }
+    })
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.candidates[0].content.parts[0].text.trim();
+}
+
+async function generateSceneImage(apiKey, prompt) {
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      instances: [{ prompt: `${prompt}, dark atmospheric horror environment, no people, cinematic lighting, moody, detailed` }],
+      parameters: { sampleCount: 1, aspectRatio: '16:9' }
+    })
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message);
+  const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+  if (!b64) throw new Error('No image data');
+  return `data:image/png;base64,${b64}`;
+}
+
+async function updateSceneBackground(apiKey, sceneText) {
+  if (!bgGenerationEnabled) return;
+  const cacheKey = sceneText.slice(0, 60);
+  if (sceneBackgroundCache[cacheKey]) {
+    setSceneBackground(sceneBackgroundCache[cacheKey]);
+    return;
+  }
+  const btn = document.getElementById('bg-toggle');
+  btn.textContent = '🖼 生成中...';
+  btn.classList.add('generating');
+  try {
+    const prompt = await extractScenePrompt(apiKey, sceneText);
+    const imageUrl = await generateSceneImage(apiKey, prompt);
+    sceneBackgroundCache[cacheKey] = imageUrl;
+    saveBgCache();
+    setSceneBackground(imageUrl);
+  } catch(e) {
+    console.warn('Scene background generation failed:', e);
+  } finally {
+    btn.classList.remove('generating');
+    btn.textContent = bgGenerationEnabled ? '🖼 背景ON' : '🖼 背景OFF';
+  }
+}
+
+// ─── 描写キャッシュ（キーワードマッチング）────────────
+const DESC_CACHE_KEY = 'emokroa_scene_descriptions';
+const DESC_MAX_ENTRIES = 50;
+let sceneDescriptionCache = [];
+
+const DESC_TAG_PATTERNS = {
+  場所: ['廃病院','病院','廃墟','学校','教室','森','神社','寺','家','部屋','地下','路地','駅','公園','海','山','川','橋','洞窟','ビル','工場','倉庫','図書館','教会','墓地','商店街','アパート','マンション','屋上','地下室','廊下','階段'],
+  天気: ['雨','霧','霞','嵐','雪','晴','曇','台風','霰','霜','靄'],
+  時間帯: ['夜','深夜','朝','夜明け','昼','夕','黄昏','夕暮れ','払暁','真夜中','早朝','夜中'],
+  雰囲気: ['静寂','恐怖','不安','暗闇','血','腐敗','異臭','冷気','怪異','幻','呪い','孤独','絶望','怒り','悲しみ','混沌','崩壊','廃退','荒廃'],
+};
+
+function extractDescTags(text) {
+  const tags = {};
+  for (const [cat, keywords] of Object.entries(DESC_TAG_PATTERNS)) {
+    const found = keywords.filter(k => text.includes(k));
+    if (found.length > 0) tags[cat] = found;
+  }
+  return tags;
+}
+
+function calcTagSimilarity(t1, t2) {
+  let matches = 0, total = 0;
+  for (const cat of Object.keys(DESC_TAG_PATTERNS)) {
+    const a = t1[cat] || [], b = t2[cat] || [];
+    matches += a.filter(k => b.includes(k)).length;
+    total += Math.max(a.length, b.length);
+  }
+  return total === 0 ? 0 : matches / total;
+}
+
+function findSimilarDescriptions(tags, threshold = 0.75, limit = 2) {
+  return sceneDescriptionCache
+    .map(entry => ({ entry, score: calcTagSimilarity(tags, entry.tags) }))
+    .filter(x => x.score >= threshold)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(x => x.entry);
+}
+
+function saveSceneDescription(text) {
+  const tags = extractDescTags(text);
+  if (Object.keys(tags).length === 0) return; // タグなしは保存しない
+  const entry = { id: Date.now(), tags, text: text.slice(0, 500) };
+  sceneDescriptionCache.push(entry);
+  if (sceneDescriptionCache.length > DESC_MAX_ENTRIES) {
+    sceneDescriptionCache = sceneDescriptionCache.slice(-DESC_MAX_ENTRIES);
+  }
+  try {
+    localStorage.setItem(DESC_CACHE_KEY, JSON.stringify(sceneDescriptionCache));
+  } catch(e) { console.warn('Desc cache save failed:', e); }
+}
+
+function loadDescriptionCache() {
+  try {
+    const raw = localStorage.getItem(DESC_CACHE_KEY);
+    if (raw) sceneDescriptionCache = JSON.parse(raw);
+  } catch(e) { sceneDescriptionCache = []; }
+}
+
 // ─── UI ヘルパー ─────────────────────────────
 function setStatus(msg, type = '') {
   const el = document.getElementById('status');
@@ -1461,7 +1652,15 @@ function buildSystemPrompt() {
 - 応答は250〜400文字程度を目安に、テンポよく進行する
 - 《怪異》は即座に害をなす存在とは限らない。謎めいた・悲しい・美しい側面も描く
 
-まず共鳴者の背景とシナリオタイプに基づいた冒頭シーンを描写し、セッションを開始してください。`;
+まず共鳴者の背景とシナリオタイプに基づいた冒頭シーンを描写し、セッションを開始してください。${(()=>{
+  // 過去の類似描写を参照として注入
+  const contextText = `${scenarioMap[scenario]} ${bg} ${name}`;
+  const tags = extractDescTags(contextText);
+  const similar = findSimilarDescriptions(tags, 0.3, 2);
+  if (similar.length === 0) return '';
+  const refs = similar.map(e => `「${e.text.slice(0, 180)}」`).join('\n');
+  return `\n\n【過去セッションの類似描写（スタイル参考）】\n${refs}`;
+})()}`;
 }
 
 // ─── API ────────────────────────────────────
@@ -1561,7 +1760,9 @@ function startRecognition(apiKey) {
       const reply = await sendMessage(apiKey, text);
       removeThinkingEntry();
       addLog('DL', reply);
+      saveSceneDescription(reply);
       setStatus('');
+      updateSceneBackground(apiKey, reply);
       await speakText(apiKey, reply);
     } catch (err) {
       removeThinkingEntry();
@@ -1618,7 +1819,9 @@ async function sendTextInput() {
     const reply = await sendMessage(apiKey, text);
     removeThinkingEntry();
     addLog('DL', reply);
+    saveSceneDescription(reply);
     setStatus('');
+    updateSceneBackground(apiKey, reply);
     await speakText(apiKey, reply);
   } catch (err) {
     removeThinkingEntry();
@@ -1651,6 +1854,7 @@ async function startSession() {
   try {
     const opening = await generateOpening(apiKey);
     conversationHistory.push({ role: 'model', parts: [{ text: opening }] });
+    saveSceneDescription(opening);
 
     // UI切り替え
     document.getElementById('scenario-box').style.display = 'block';
@@ -1670,7 +1874,11 @@ async function startSession() {
     sessionActive = true;
     document.body.classList.add('session-active');
     saveCharacter();  // セッション開始時に自動保存
+    document.getElementById('bg-toggle').style.display = 'block';
+    bgGenerationEnabled = true;
+    document.getElementById('bg-toggle').textContent = '🖼 背景ON';
     setStatus('セッション進行中 — 話しかけるかテキストで行動を入力してください', 'active');
+    updateSceneBackground(apiKey, opening);
     await speakText(apiKey, opening);
     showTextInput(apiKey);
   } catch (err) {
@@ -1705,6 +1913,8 @@ function endSession() {
   document.getElementById('dice-result').style.display = 'none';
 
   document.body.classList.remove('session-active');
+  document.getElementById('bg-toggle').style.display = 'none';
+  clearSceneBackground();
   conversationHistory = [];
   const textRow = document.getElementById('text-input-row');
   if (textRow) textRow.remove();
@@ -2023,6 +2233,8 @@ function updateSaveBar(data) {
 updateStats();
 loadCharacter();        // saveがあればskillLevels復元 → renderSkillsTab()を呼ぶ
 if (!localStorage.getItem(SAVE_KEY)) renderSkillsTab(); // 初回（saveなし）
+loadBgCache();
+loadDescriptionCache();
 </script>
 </body>
 </html>

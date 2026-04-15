@@ -1470,18 +1470,34 @@
     <div class="screen-title">設定</div>
   </div>
   <div class="character-panel" style="max-width:600px;">
-    <div class="panel-title">API KEY</div>
-    <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px;">
-      <p style="font-size:13px;color:var(--text-dim);line-height:1.7;">
-        Google AI Studio で発行した API キーを入力してください。<br>
-        キーはブラウザのローカルストレージに保存されます。
-      </p>
-      <div class="field-group">
-        <label>API KEY</label>
-        <input type="password" id="api-key" placeholder="AIza... (Google AI StudioのAPIキー)" />
+    <div class="panel-title">API KEY 設定</div>
+    <div style="display:flex;flex-direction:column;gap:20px;padding-top:8px;">
+
+      <!-- 取得手順 -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
+        <div style="font-family:'Cinzel',serif;font-size:11px;color:var(--purple);letter-spacing:0.15em;">APIキーの取得方法</div>
+        <ol style="font-size:13px;color:var(--text-dim);line-height:1.9;margin:0;padding-left:20px;">
+          <li>ブラウザで <span style="color:var(--teal);font-family:monospace;">aistudio.google.com</span> を開く</li>
+          <li>Googleアカウントでログイン</li>
+          <li>左メニューの「<strong style="color:var(--text);">Get API key</strong>」をクリック</li>
+          <li>「<strong style="color:var(--text);">Create API key</strong>」をクリック</li>
+          <li>表示された <span style="color:var(--teal);font-family:monospace;">AIza...</span> から始まるキーをコピー</li>
+          <li>下の入力欄に貼り付けて「保存」</li>
+        </ol>
+        <p style="font-size:12px;color:var(--text-dim);font-style:italic;margin:0;">
+          ※ APIキーは無料で発行できます（利用量に応じて課金が発生する場合があります）<br>
+          ※ キーはこのデバイスのブラウザにのみ保存され、外部には送信されません
+        </p>
       </div>
-      <div>
+
+      <!-- 入力フォーム -->
+      <div class="field-group">
+        <label>APIキーを入力</label>
+        <input type="password" id="api-key" placeholder="AIza... (ここに貼り付け)" />
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;">
         <button class="btn btn-primary" onclick="saveApiKey()">保存</button>
+        <button class="btn btn-secondary" onclick="toggleApiKeyVisibility()" id="api-key-toggle" style="font-size:10px;padding:8px 14px;">表示</button>
       </div>
       <div id="settings-status" style="font-size:13px;color:var(--teal);font-style:italic;min-height:20px;"></div>
     </div>
@@ -1736,6 +1752,23 @@ function saveApiKey() {
     const el = document.getElementById('settings-status');
     el.textContent = 'APIキーを保存しました。';
     setTimeout(() => { if (el) el.textContent = ''; }, 3000);
+  } else {
+    const el = document.getElementById('settings-status');
+    el.style.color = 'var(--red-bright)';
+    el.textContent = 'APIキーを入力してください。';
+    setTimeout(() => { if (el) { el.textContent = ''; el.style.color = 'var(--teal)'; } }, 3000);
+  }
+}
+
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('api-key');
+  const btn = document.getElementById('api-key-toggle');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '隠す';
+  } else {
+    input.type = 'password';
+    btn.textContent = '表示';
   }
 }
 

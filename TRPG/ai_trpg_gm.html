@@ -3285,6 +3285,11 @@ function pcmToWav(pcm, sampleRate) {
 }
 
 // ─── 音声認識 ────────────────────────────────
+let _recognizing = false;        // 認識中か
+let _recogUserActive = false;    // ユーザーが録音継続を意図しているか
+let _recogShouldSubmit = false;  // 停止後に送信するか
+let _recogFinalText = '';        // 確定済みテキストの蓄積
+
 function startRecognition(apiKey) {
   if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
     setStatus('音声認識非対応。テキスト入力をお使いください。', 'error');
@@ -3294,43 +3299,44 @@ function startRecognition(apiKey) {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const recognition = new SR();
   recognition.lang = 'ja-JP';
-  recognition.interimResults = false;
+  recognition.continuous = true;       // 区切っても止めない（長文対応）
+  recognition.interimResults = true;   // 認識途中も拾う
   recognition.maxAlternatives = 1;
 
   const btn = document.getElementById('voice-btn');
   const hint = document.getElementById('voice-hint');
   btn.classList.add('recording');
-  hint.textContent = '聞いています...';
+  hint.textContent = '聞いています…（もう一度ボタンで確定）';
+  _recognizing = true;
+  _recogUserActive = true;
+  _recogShouldSubmit = false;
+  _recogFinalText = '';
 
-  recognition.onresult = async (e) => {
-    const text = e.results[0][0].transcript;
-    addLog('You', text);
-    btn.classList.remove('recording');
-    hint.textContent = 'ボタンを押して話す';
-    addThinkingEntry();
-    setStatus('ディーラーが応答を考えています...', 'active');
-    try {
-      const reply = await sendMessage(apiKey, text);
-      removeThinkingEntry();
-      addLog('DL', reply);
-      saveSceneDescription(reply);
-      setStatus('');
-      updateSceneBackground(apiKey, reply);
-      attachRollActions(reply);
-      await speakText(apiKey, reply);
-    } catch (err) {
-      removeThinkingEntry();
-      setStatus('エラー: ' + err.message, 'error');
+  recognition.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const tr = e.results[i][0].transcript;
+      if (e.results[i].isFinal) _recogFinalText += tr;
+      else interim += tr;
     }
+    hint.textContent = (_recogFinalText + interim) || '聞いています…';
   };
   recognition.onerror = (e) => {
-    btn.classList.remove('recording');
-    hint.textContent = 'ボタンを押して話す';
-    if (e.error !== 'no-speech') setStatus('音声認識エラー: ' + e.error, 'error');
+    if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      setStatus('音声認識エラー: ' + e.error, 'error');
+    }
   };
   recognition.onend = () => {
+    // 沈黙などで自動終了したが、ユーザーがまだ録音継続中なら再開して聞き続ける
+    if (_recogUserActive && !_recogShouldSubmit) {
+      try { recognition.start(); return; } catch (err) { /* 再開不可ならクリーンアップ */ }
+    }
+    _recognizing = false;
+    _recogUserActive = false;
     btn.classList.remove('recording');
     hint.textContent = 'ボタンを押して話す';
+    const text = _recogFinalText.trim();
+    if (_recogShouldSubmit && text) processPlayerInput(apiKey, text);
   };
   recognition.start();
   window._recognition = recognition;
@@ -3340,7 +3346,36 @@ function toggleVoice() {
   const apiKey = document.getElementById('api-key').value.trim();
   if (!apiKey) { setStatus('APIキーを入力してください', 'error'); return; }
   if (!sessionActive) return;
-  startRecognition(apiKey);
+  if (_recognizing && window._recognition) {
+    // 録音停止 → 確定して送信
+    _recogShouldSubmit = true;
+    _recogUserActive = false;
+    document.getElementById('voice-hint').textContent = '認識結果を送信中…';
+    try { window._recognition.stop(); } catch (e) {}
+  } else {
+    startRecognition(apiKey);
+  }
+}
+
+// プレイヤーの行動（音声/テキスト共通）をGMに送り、応答を反映する
+async function processPlayerInput(apiKey, text) {
+  if (!text || !apiKey) return;
+  addLog('You', text);
+  addThinkingEntry();
+  setStatus('ディーラーが応答を考えています...', 'active');
+  try {
+    const reply = await sendMessage(apiKey, text);
+    removeThinkingEntry();
+    addLog('DL', reply);
+    saveSceneDescription(reply);
+    setStatus('');
+    updateSceneBackground(apiKey, reply);
+    attachRollActions(reply);
+    await speakText(apiKey, reply);
+  } catch (err) {
+    removeThinkingEntry();
+    setStatus('エラー: ' + err.message, 'error');
+  }
 }
 
 function showTextInput(apiKey) {
@@ -3366,22 +3401,7 @@ async function sendTextInput() {
   const text = input.value.trim();
   if (!text || !apiKey) return;
   input.value = '';
-  addLog('You', text);
-  addThinkingEntry();
-  setStatus('ディーラーが応答を考えています...', 'active');
-  try {
-    const reply = await sendMessage(apiKey, text);
-    removeThinkingEntry();
-    addLog('DL', reply);
-    saveSceneDescription(reply);
-    setStatus('');
-    updateSceneBackground(apiKey, reply);
-    attachRollActions(reply);
-    await speakText(apiKey, reply);
-  } catch (err) {
-    removeThinkingEntry();
-    setStatus('エラー: ' + err.message, 'error');
-  }
+  await processPlayerInput(apiKey, text);
 }
 
 // ─── セッション管理 ─────────────────────────

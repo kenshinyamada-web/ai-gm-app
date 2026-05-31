@@ -2405,7 +2405,26 @@ function toggleBgGeneration() {
   bgGenerationEnabled = !bgGenerationEnabled;
   const btn = document.getElementById('bg-toggle');
   btn.textContent = bgGenerationEnabled ? '🖼 背景ON' : '🖼 背景OFF';
-  if (!bgGenerationEnabled) clearSceneBackground();
+  const bg = document.getElementById('scene-bg');
+  if (!bgGenerationEnabled) {
+    // OFF：表示を隠すだけ。画像と場所情報は保持して、ONで即復帰できるようにする
+    bg.classList.remove('visible');
+    return;
+  }
+  // ON：既存の背景画像があれば即再表示。無ければ現在の場面で生成
+  if (bg.style.backgroundImage && bg.style.backgroundImage !== 'none') {
+    bg.classList.add('visible');
+    return;
+  }
+  const apiKey = document.getElementById('api-key').value.trim();
+  let lastScene = '';
+  for (let i = conversationHistory.length - 1; i >= 0; i--) {
+    if (conversationHistory[i].role === 'model') { lastScene = conversationHistory[i].parts?.[0]?.text || ''; break; }
+  }
+  if (apiKey && lastScene) {
+    currentSceneLocation = null;  // 強制的に現在の場面を生成させる
+    updateSceneBackground(apiKey, lastScene);
+  }
 }
 
 async function extractScenePrompt(apiKey, sceneText) {

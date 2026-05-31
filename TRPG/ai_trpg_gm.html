@@ -2432,7 +2432,7 @@ async function extractScenePrompt(apiKey, sceneText) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: `以下の日本語シーン描写から、背景画像生成用の英語プロンプトを1文で作成してください。場所・雰囲気・照明・時間帯を含めてください。人物は含めないでください。プロンプトのみ返してください:\n\n${sceneText.slice(0, 400)}` }] }],
+      contents: [{ role: 'user', parts: [{ text: `以下の日本語シーン描写から、背景画像生成用の英語プロンプトを1文で作成してください。場所・雰囲気・照明・時間帯を含めてください。人物は含めないでください。\n\n【厳守】実在の企業名・商品名・ブランド・ロゴ・商標、実在の人物、版権キャラクターや既存作品のIP、実在の固有名詞は一切含めないこと。元の描写にそれらが出てきても、必ず一般名詞や架空の名称に置き換える（例：特定コンビニ→"a generic convenience store"、実在ブランド→無地・無名のデザイン）。看板や文字は読めない汎用的なものにする。\n\nプロンプトのみ返してください:\n\n${sceneText.slice(0, 400)}` }] }],
       generationConfig: { maxOutputTokens: 200, thinkingConfig: { thinkingBudget: 0 } }
     })
   });
@@ -2442,7 +2442,7 @@ async function extractScenePrompt(apiKey, sceneText) {
 }
 
 async function generateSceneImage(apiKey, prompt) {
-  const fullPrompt = `${prompt}, dark atmospheric horror environment, no people, cinematic lighting, moody, detailed, 16:9 widescreen aspect ratio`;
+  const fullPrompt = `${prompt}, dark atmospheric horror environment, no people, cinematic lighting, moody, detailed, 16:9 widescreen aspect ratio, original generic design only, no brand names, no logos, no trademarks, no copyrighted characters, no real company or product names, no readable real-world text or signage`;
   const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

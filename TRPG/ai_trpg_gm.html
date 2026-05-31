@@ -1461,6 +1461,16 @@
             <option value="serious">シリアス・重厚</option>
           </select>
         </div>
+        <div class="field-group">
+          <label>想定プレイ時間</label>
+          <select id="scenario-length">
+            <option value="10">10分（ショート）</option>
+            <option value="20">20分（短め）</option>
+            <option value="30" selected>30分（標準）</option>
+            <option value="60">60分（じっくり）</option>
+            <option value="90">90分（長編）</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -1979,6 +1989,21 @@ function dbDelete(store, key) {
 let currentSessionId = null;
 let sessionLogEntries = [];
 let _sessionStartedAt = null;
+let sessionTargetMinutes = 30;   // 想定プレイ時間（分）
+
+// 進行状況の指示を生成（GMのペース配分用）。
+// 中断・再開に強いよう、実時間ではなく「プレイのやり取り回数」を進行度の基準にする。
+function buildPacingNote() {
+  const playerTurns = conversationHistory.filter(m => m.role === 'user').length;
+  const targetTurns = Math.max(4, Math.round(sessionTargetMinutes / 1.5)); // 想定分数→目安ターン数
+  const ratio = playerTurns / targetTurns;
+  let phase;
+  if (ratio < 0.5)      phase = '導入〜展開を進める段階。世界観と謎を提示しつつテンポよく進める。';
+  else if (ratio < 0.8) phase = '中盤〜クライマックスへ向かわせる段階。核心に踏み込み緊張を高める。';
+  else if (ratio < 1.0) phase = '終盤。伏線を回収し、結末・エンディングへ導く。寄り道は切り上げる。';
+  else                  phase = '想定の尺に到達。次の数ターンで必ず物語を締めくくり、最後に「— セッション終了 —」と記す。';
+  return `\n\n【進行状況】想定プレイ時間 約${sessionTargetMinutes}分（目安 約${targetTurns}ターン）/ 現在 ${playerTurns}ターン目。${phase}`;
+}
 
 async function saveSession(isComplete = false) {
   try {
@@ -1995,6 +2020,7 @@ async function saveSession(isComplete = false) {
       systemPrompt: sessionSystemPrompt,
       logEntries: [...sessionLogEntries],
       sceneLocation: currentSceneLocation,
+      targetMinutes: sessionTargetMinutes,
       isComplete,
     };
     if (currentSessionId !== null) data.id = currentSessionId;
@@ -2022,6 +2048,7 @@ function applyCharacterData(d) {
   if (d.emRoots) document.getElementById('em-roots').value = d.emRoots;
   if (d.scenario) document.getElementById('scenario-type').value = d.scenario;
   if (d.dlStyle)  document.getElementById('dl-style').value      = d.dlStyle;
+  if (d.scenarioLength) document.getElementById('scenario-length').value = d.scenarioLength;
   kyoumeiLevel = d.kyoumei || 1;
   skillLevels  = d.skillLevels  || {};
   skillCustoms = d.skillCustoms || {};
@@ -2044,6 +2071,7 @@ async function resumeSession(sess) {
   sessionLogEntries  = sess.logEntries || [];
   currentSceneLocation = sess.sceneLocation || null;
   gmReplyLocation      = sess.sceneLocation || null;
+  sessionTargetMinutes = sess.targetMinutes || 30;
 
   // ログを再描画
   const logEl = document.getElementById('log');
@@ -2870,6 +2898,9 @@ function buildSystemPrompt() {
 
   const scenario = document.getElementById('scenario-type').value;
   const dlStyle  = document.getElementById('dl-style').value;
+  const targetMin = parseInt(document.getElementById('scenario-length').value, 10) || 30;
+  // 想定プレイ時間 → おおよそのシーン数（テンポの目安）
+  const targetScenes = Math.max(3, Math.round(targetMin / 6));
 
   const scenarioMap = {
     mystery:       '日常に潜む怪奇事件・都市の闇に関わる謎',
@@ -2892,6 +2923,13 @@ function buildSystemPrompt() {
 
 【シナリオタイプ】${scenarioMap[scenario]}
 【DLスタイル】${styleMap[dlStyle]}
+【想定プレイ時間】約${targetMin}分（おおよそ${targetScenes}シーン程度で起承転結を完結させる）
+
+【尺・ペース配分（重要）】
+- このセッションは約${targetMin}分で結末まで到達する一話完結を目指す。だらだら続けず、導入→展開→クライマックス→結末の構成で確実に畳む。
+- 物語をおおよそ${targetScenes}個の場面で構成し、中盤で核心、終盤でクライマックス、最後にエンディング（余韻）を描く。
+- 別途与えられる【進行状況】の経過時間に従い、残りが少なければ寄り道を切り上げ、結末へ向けて急ぐ。
+- 結末に達したら物語を締めくくり、最後に「— セッション終了 —」と明記する。
 
 【共鳴者データ】
 - 名前：${name}（${age}・${cls}）
@@ -3017,7 +3055,7 @@ async function sendMessage(apiKey, userText) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: sessionSystemPrompt }] },
+      system_instruction: { parts: [{ text: sessionSystemPrompt + buildPacingNote() }] },
       contents: conversationHistory,
       generationConfig: { maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } }
     })
@@ -3247,6 +3285,7 @@ async function startSession() {
 
   setStatus('シナリオを生成中...', 'active');
   document.getElementById('start-btn').disabled = true;
+  sessionTargetMinutes = parseInt(document.getElementById('scenario-length').value, 10) || 30;
   sessionSystemPrompt = buildSystemPrompt();
   conversationHistory = [];
   sessionLogEntries = [];
@@ -3567,6 +3606,7 @@ async function saveCharacter() {
     emRoots:    document.getElementById('em-roots').value,
     scenario:   document.getElementById('scenario-type').value,
     dlStyle:    document.getElementById('dl-style').value,
+    scenarioLength: document.getElementById('scenario-length').value,
     kyoumei:      kyoumeiLevel,
     skillLevels:  { ...skillLevels },
     skillCustoms: { ...skillCustoms },

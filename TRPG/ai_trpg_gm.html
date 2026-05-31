@@ -2042,6 +2042,7 @@ async function updateSceneBackground(apiKey, sceneText) {
     setSceneBackground(imageUrl);
   } catch(e) {
     console.warn('Scene background generation failed:', e);
+    setStatus('背景画像の生成に失敗: ' + (e.message || e) + '（Imagenは課金が必要な場合があります）', 'error');
   } finally {
     btn.classList.remove('generating');
     btn.textContent = bgGenerationEnabled ? '🖼 背景ON' : '🖼 背景OFF';

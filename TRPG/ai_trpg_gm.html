@@ -1603,6 +1603,46 @@
       <div id="settings-status" style="font-size:13px;color:var(--teal);font-style:italic;min-height:20px;"></div>
     </div>
   </div>
+
+  <!-- 音声設定 -->
+  <div class="character-panel" style="max-width:600px;margin-top:24px;">
+    <div class="panel-title">音声設定</div>
+    <div style="display:flex;flex-direction:column;gap:20px;padding-top:8px;">
+
+      <div class="field-group">
+        <label>ディーラーの音声読み上げ</label>
+        <select id="tts-enabled" onchange="saveVoiceSettings()">
+          <option value="on">ON（読み上げる）</option>
+          <option value="off">OFF（読み上げない）</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label>声の種類</label>
+        <select id="tts-voice" onchange="saveVoiceSettings()">
+          <option value="Charon">Charon（低め・落ち着き／推奨）</option>
+          <option value="Enceladus">Enceladus（息づかい・囁き）</option>
+          <option value="Gacrux">Gacrux（成熟・重厚）</option>
+          <option value="Rasalgethi">Rasalgethi（語り部風）</option>
+          <option value="Algenib">Algenib（しゃがれ声）</option>
+          <option value="Umbriel">Umbriel（穏やか）</option>
+          <option value="Kore">Kore（芯のある女声）</option>
+          <option value="Vindemiatrix">Vindemiatrix（優しい女声）</option>
+          <option value="Leda">Leda（若々しい女声）</option>
+          <option value="Sulafat">Sulafat（温かみ）</option>
+        </select>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button class="btn btn-secondary" onclick="testVoice()" id="tts-test-btn">▷ テスト再生</button>
+      </div>
+      <div id="voice-settings-status" style="font-size:13px;color:var(--teal);font-style:italic;min-height:20px;"></div>
+      <p style="font-size:12px;color:var(--text-dim);font-style:italic;margin:0;">
+        ※ 音声には Gemini TTS（APIキー）を使用します<br>
+        ※ ブラウザの仕様上、最初の再生は画面を一度タップ／操作した後に有効になります
+      </p>
+    </div>
+  </div>
 </div>
 
 <!-- 技能確認モーダル -->
@@ -1640,6 +1680,30 @@ let kyoumeiLevel = 1;
 // ─── 定数（画面遷移で使うため先頭に定義） ────────
 const SAVE_KEY = 'emoklore_character';
 const API_KEY_STORE = 'emokroa_api_key';
+
+// ─── 音声設定 ────────────────────────────────
+const TTS_ENABLED_STORE = 'emokroa_tts_enabled';
+const TTS_VOICE_STORE = 'emokroa_tts_voice';
+let ttsEnabled = localStorage.getItem(TTS_ENABLED_STORE) !== 'off';
+let ttsVoice = localStorage.getItem(TTS_VOICE_STORE) || 'Charon';
+
+function saveVoiceSettings() {
+  ttsEnabled = document.getElementById('tts-enabled').value === 'on';
+  ttsVoice = document.getElementById('tts-voice').value;
+  localStorage.setItem(TTS_ENABLED_STORE, ttsEnabled ? 'on' : 'off');
+  localStorage.setItem(TTS_VOICE_STORE, ttsVoice);
+  const el = document.getElementById('voice-settings-status');
+  if (el) { el.textContent = '音声設定を保存しました。'; setTimeout(() => { if (el) el.textContent = ''; }, 3000); }
+}
+
+async function testVoice() {
+  const apiKey = (localStorage.getItem(API_KEY_STORE) || document.getElementById('api-key').value || '').trim();
+  const el = document.getElementById('voice-settings-status');
+  if (!apiKey) { if (el) { el.style.color = 'var(--red-bright)'; el.textContent = 'APIキーを先に保存してください。'; setTimeout(() => { if (el) { el.textContent = ''; el.style.color = 'var(--teal)'; } }, 3000); } return; }
+  if (el) el.textContent = 'テスト音声を生成中...';
+  await speakText(apiKey, 'ようこそ。これはディーラーの声のテストです。', true);
+  if (el) el.textContent = '';
+}
 
 // ─── IndexedDB ───────────────────────────────
 const DB_NAME = 'trpg-emokroa';
@@ -1855,6 +1919,8 @@ async function menuAction(action) {
   } else if (action === 'settings') {
     const saved = localStorage.getItem(API_KEY_STORE) || '';
     document.getElementById('api-key').value = saved;
+    document.getElementById('tts-enabled').value = ttsEnabled ? 'on' : 'off';
+    document.getElementById('tts-voice').value = ttsVoice;
     document.getElementById('settings-screen').classList.add('active');
   }
 }
@@ -2503,7 +2569,8 @@ async function sendMessage(apiKey, userText) {
   return replyText;
 }
 
-async function speakText(apiKey, text) {
+async function speakText(apiKey, text, force = false) {
+  if (!ttsEnabled && !force) return;
   try {
     const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
       method: 'POST',
@@ -2512,7 +2579,7 @@ async function speakText(apiKey, text) {
         contents: [{ parts: [{ text }] }],
         generationConfig: {
           responseModalities: ['AUDIO'],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } }
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: ttsVoice } } }
         }
       })
     });

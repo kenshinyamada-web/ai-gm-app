@@ -1,4 +1,4 @@
-const CACHE_NAME = 'trpg-emokroa-v5';
+const CACHE_NAME = 'trpg-emokroa-v6';
 const CACHE_URLS = [
   './ai_trpg_gm.html',
   './manifest.json',

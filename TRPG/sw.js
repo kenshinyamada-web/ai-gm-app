@@ -1,4 +1,4 @@
-const CACHE_NAME = 'trpg-emokroa-v13';
+const CACHE_NAME = 'trpg-emokroa-v14';
 const CACHE_URLS = [
   './ai_trpg_gm.html',
   './manifest.json',
@@ -22,12 +22,30 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // キャッシュ優先（同一オリジンのみ）
-  if (!event.request.url.startsWith(self.location.origin)) return;
+  const req = event.request;
+  // 同一オリジンのみ扱う
+  if (!req.url.startsWith(self.location.origin)) return;
   // API リクエストはキャッシュしない
-  if (event.request.url.includes('googleapis.com')) return;
+  if (req.url.includes('googleapis.com')) return;
 
+  // HTML（ページ遷移）はネットワーク優先：オンラインなら常に最新を取得し、
+  // 取得できたらキャッシュも更新。オフライン時のみキャッシュにフォールバック。
+  const isHTML = req.mode === 'navigate' || req.destination === 'document' || req.url.endsWith('.html');
+  if (isHTML) {
+    event.respondWith(
+      fetch(req)
+        .then(res => {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(req, copy)).catch(() => {});
+          return res;
+        })
+        .catch(() => caches.match(req).then(cached => cached || caches.match('./ai_trpg_gm.html')))
+    );
+    return;
+  }
+
+  // その他のアセットはキャッシュ優先
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
+    caches.match(req).then(cached => cached || fetch(req))
   );
 });

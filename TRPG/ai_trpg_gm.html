@@ -1994,6 +1994,7 @@ async function saveSession(isComplete = false) {
       conversationHistory: [...conversationHistory],
       systemPrompt: sessionSystemPrompt,
       logEntries: [...sessionLogEntries],
+      sceneLocation: currentSceneLocation,
       isComplete,
     };
     if (currentSessionId !== null) data.id = currentSessionId;
@@ -2041,6 +2042,8 @@ async function resumeSession(sess) {
   currentCharId      = sess.characterId || currentCharId;
   _sessionStartedAt  = sess.startedAt;
   sessionLogEntries  = sess.logEntries || [];
+  currentSceneLocation = sess.sceneLocation || null;
+  gmReplyLocation      = sess.sceneLocation || null;
 
   // ログを再描画
   const logEl = document.getElementById('log');
@@ -2072,6 +2075,10 @@ async function resumeSession(sess) {
   document.getElementById('bg-toggle').style.display = 'block';
   bgGenerationEnabled = true;
   document.getElementById('bg-toggle').textContent = '🖼 背景ON';
+  // 前回の背景を復元（同じ場所のキャッシュ画像があれば即表示）
+  if (currentSceneLocation && sceneBackgroundCache[currentSceneLocation]) {
+    setSceneBackground(sceneBackgroundCache[currentSceneLocation]);
+  }
   setStatus('セッションを再開しました。', 'active');
 
   const apiKey = document.getElementById('api-key').value.trim();
@@ -3244,6 +3251,7 @@ async function startSession() {
     document.getElementById('bg-toggle').textContent = '🖼 背景ON';
     setStatus('セッション進行中 — 話しかけるかテキストで行動を入力してください', 'active');
     updateSceneBackground(apiKey, opening);
+    saveSession();    // 序章の背景の場所を記録（再開時の背景復元用）
     await speakText(apiKey, opening);
     showTextInput(apiKey);
   } catch (err) {

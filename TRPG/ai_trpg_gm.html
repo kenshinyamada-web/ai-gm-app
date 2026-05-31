@@ -1652,6 +1652,16 @@
   <div id="library-entries"></div>
 </div>
 
+<!-- ─── 続きから（中断中シナリオ一覧）画面 ──────── -->
+<div class="sub-screen" id="continue-screen">
+  <div class="screen-header">
+    <button class="back-btn" onclick="showMenu()">◂ メニュー</button>
+    <div class="screen-title">続きから</div>
+  </div>
+  <p style="font-size:13px;color:var(--text-dim);font-style:italic;">中断中のシナリオから選んで再開できます。不要なものは削除してください。</p>
+  <div id="continue-entries"></div>
+</div>
+
 <!-- ─── キャラクター選択画面 ───────────────────── -->
 <div class="sub-screen" id="character-screen">
   <div class="screen-header">
@@ -1979,14 +1989,18 @@ async function showMenu() {
   document.getElementById('game-container').style.display = 'none';
   document.getElementById('library-screen').classList.remove('active');
   document.getElementById('character-screen').classList.remove('active');
+  document.getElementById('continue-screen').classList.remove('active');
   document.getElementById('settings-screen').classList.remove('active');
-  // 続きから・キャラクター選択は保存済みキャラがある時のみ有効
+  // キャラクター選択は保存済みキャラ、続きからは中断中シナリオがある時のみ有効
   let hasChars = !!localStorage.getItem(SAVE_KEY);
+  let hasIncomplete = false;
   try {
     const chars = await dbGetAll('characters');
     hasChars = chars.length > 0;
+    const sessions = await dbGetAll('sessions');
+    hasIncomplete = sessions.some(s => !s.isComplete);
   } catch(e) { /* localStorage の値をフォールバックに使う */ }
-  document.getElementById('menu-btn-continue').classList.toggle('disabled', !hasChars);
+  document.getElementById('menu-btn-continue').classList.toggle('disabled', !hasIncomplete);
   document.getElementById('menu-btn-select').classList.toggle('disabled', !hasChars);
 }
 
@@ -2002,25 +2016,9 @@ async function menuAction(action) {
     setStatus('新規キャラクターを作成してください。');
 
   } else if (action === 'continue') {
-    // IndexedDBから未完了セッションを検索
-    try {
-      const sessions = await dbGetAll('sessions');
-      const incomplete = sessions
-        .filter(s => !s.isComplete)
-        .sort((a, b) => new Date(b.lastSavedAt) - new Date(a.lastSavedAt));
-      if (incomplete.length > 0) {
-        document.getElementById('game-container').style.display = 'flex';
-        await resumeSession(incomplete[0]);
-        return;
-      }
-    } catch(e) { console.warn('Session lookup failed:', e); }
-    // 未完了セッションなし → キャラ選択へ
-    if (!hasSave) { showMenu(); return; }
-    document.getElementById('game-container').style.display = 'flex';
-    await loadCharacter();
-    document.getElementById('char-panel').style.display = 'flex';
-    document.getElementById('main-controls').style.display = 'flex';
-    setStatus('中断中のセッションはありません。新しいシナリオを開始してください。');
+    // 中断中シナリオを一覧表示（自動再開はしない）
+    await renderContinueList();
+    document.getElementById('continue-screen').classList.add('active');
 
   } else if (action === 'select') {
     // 保存済みキャラ一覧を表示
@@ -2219,6 +2217,62 @@ async function deleteCharacter(id) {
     localStorage.removeItem(SAVE_KEY);
   }
   await renderCharacterList();
+}
+
+// ─── 続きから（中断中シナリオ一覧）────────────
+async function renderContinueList() {
+  const container = document.getElementById('continue-entries');
+  if (!container) return;
+  container.innerHTML = '<div class="library-empty">読み込み中...</div>';
+
+  let sessions = [];
+  try { sessions = await dbGetAll('sessions'); } catch(e) { console.warn(e); }
+  const incomplete = sessions
+    .filter(s => !s.isComplete)
+    .sort((a, b) => new Date(b.lastSavedAt) - new Date(a.lastSavedAt));
+
+  if (incomplete.length === 0) {
+    container.innerHTML = '<div class="library-empty">中断中のシナリオはありません。<br>「キャラクター選択」または「はじめから」で新しいシナリオを始めてください。</div>';
+    return;
+  }
+
+  container.innerHTML = incomplete.map(s => {
+    const date = new Date(s.lastSavedAt).toLocaleString('ja-JP');
+    const lastDl = [...(s.logEntries || [])].reverse().find(e => e.cls === 'dl' || e.speaker === 'DL');
+    const snippet = (lastDl?.text || s.conversationHistory?.[0]?.parts?.[0]?.text || '').slice(0, 80);
+    return `<div class="library-entry">
+      <div class="library-tags" style="justify-content:space-between;align-items:center;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span style="font-family:'Cinzel',serif;font-size:14px;color:var(--text);">${escapeHtml(s.characterName || '共鳴者')}</span>
+          <span class="library-tag">∞共鳴 Lv.${s.kyoumeiLevel || 1}</span>
+        </div>
+        <span style="font-size:11px;color:var(--text-dim);">${escapeHtml(date)}</span>
+      </div>
+      ${snippet ? `<div style="font-size:13px;color:var(--text-dim);font-style:italic;">${escapeHtml(snippet)}…</div>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+        <button class="btn btn-primary btn-xs" style="font-size:10px;padding:8px 14px;" onclick="resumeSessionById(${s.id})">▶ このシナリオを再開</button>
+        <button class="btn btn-danger btn-xs" style="font-size:10px;padding:8px 14px;" onclick="discardSession(${s.id})">削除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// 一覧から指定の中断中シナリオを再開
+async function resumeSessionById(id) {
+  let sess = null;
+  try { sess = await dbGet('sessions', id); } catch(e) { console.warn(e); }
+  if (!sess) { setStatus('セッションが見つかりませんでした。', 'error'); await renderContinueList(); return; }
+  document.getElementById('continue-screen').classList.remove('active');
+  document.getElementById('game-container').style.display = 'flex';
+  await resumeSession(sess);
+}
+
+// 中断中シナリオを削除
+async function discardSession(id) {
+  if (!confirm('この中断中シナリオを削除しますか？（会話ログの記録も消えます）')) return;
+  try { await dbDelete('sessions', id); } catch(e) { console.warn('Session delete failed:', e); }
+  if (currentSessionId === id) currentSessionId = null;
+  await renderContinueList();
 }
 
 // 一覧画面から新規キャラ作成

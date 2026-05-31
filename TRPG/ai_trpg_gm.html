@@ -1995,6 +1995,13 @@ let currentSessionId = null;
 let sessionLogEntries = [];
 let _sessionStartedAt = null;
 let sessionTargetMinutes = 30;   // 想定プレイ時間（分）
+let debriefMode = false;         // シナリオ終了後の振り返り（Q&A）モード
+
+// 振り返りモード時にGMへ渡す追加指示
+function buildDebriefNote() {
+  if (!debriefMode) return '';
+  return `\n\n【振り返りモード】このシナリオは既に終了しています。これ以降は物語を進めず、プレイヤーの質問にゲームマスターとして解説で答えてください。\n- これまでの物語とプレイヤーの選択を踏まえ、シナリオの分岐や「あの時こうしていたらどうなっていたか」を具体的に答える。\n- 隠されていた真相・伏線・選ばなかったルートの結末なども明かしてよい。\n- 新たな本編シーンの進行・場所タグ・判定要求は出さない（解説に徹する）。\n- 1〜5文程度で簡潔に、ただし要点はしっかり答える。`;
+}
 
 // 進行状況の指示を生成（GMのペース配分用）。
 // 中断・再開に強いよう、実時間ではなく「プレイのやり取り回数」を進行度の基準にする。
@@ -2026,6 +2033,7 @@ async function saveSession(isComplete = false) {
       logEntries: [...sessionLogEntries],
       sceneLocation: currentSceneLocation,
       targetMinutes: sessionTargetMinutes,
+      debriefMode,
       isComplete,
     };
     if (currentSessionId !== null) data.id = currentSessionId;
@@ -2077,6 +2085,7 @@ async function resumeSession(sess) {
   currentSceneLocation = sess.sceneLocation || null;
   gmReplyLocation      = sess.sceneLocation || null;
   sessionTargetMinutes = sess.targetMinutes || 30;
+  debriefMode          = sess.debriefMode || false;
 
   // ログを再描画
   const logEl = document.getElementById('log');
@@ -2118,7 +2127,13 @@ async function resumeSession(sess) {
   showTextInput(apiKey);
   // 直近のGM発言にロール要求があればボタンを復元
   const lastDl = [...sessionLogEntries].reverse().find(e => e.cls === 'dl' || e.speaker === 'DL');
-  if (lastDl) attachRollActions(lastDl.text);
+  if (lastDl && !debriefMode) attachRollActions(lastDl.text);
+  // 振り返りモードのセッションなら振り返りUIを復元
+  if (debriefMode) {
+    showDebriefControls();
+    const input = document.getElementById('text-input');
+    if (input) input.placeholder = '振り返りの質問（例：あの時逃げていたら？）';
+  }
   scrollChatToBottom();
 }
 
@@ -2873,6 +2888,7 @@ async function reportRollToGM(logSpeaker, logText, gmPromptText) {
     setStatus('');
     updateSceneBackground(apiKey, reply);
     attachRollActions(reply);
+    if (!debriefMode && /セッション終了/.test(reply)) enterDebriefMode();
     await speakText(apiKey, reply);
   } catch (err) {
     removeThinkingEntry();
@@ -3172,7 +3188,7 @@ async function sendMessage(apiKey, userText) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: sessionSystemPrompt + buildPacingNote() }] },
+      system_instruction: { parts: [{ text: sessionSystemPrompt + (debriefMode ? buildDebriefNote() : buildPacingNote()) }] },
       contents: conversationHistory,
       generationConfig: { maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } }
     })
@@ -3363,20 +3379,52 @@ async function processPlayerInput(apiKey, text) {
   if (!text || !apiKey) return;
   addLog('You', text);
   addThinkingEntry();
-  setStatus('ディーラーが応答を考えています...', 'active');
+  setStatus(debriefMode ? '振り返りに答えています...' : 'ディーラーが応答を考えています...', 'active');
   try {
     const reply = await sendMessage(apiKey, text);
     removeThinkingEntry();
     addLog('DL', reply);
     saveSceneDescription(reply);
     setStatus('');
-    updateSceneBackground(apiKey, reply);
-    attachRollActions(reply);
+    if (!debriefMode) {
+      updateSceneBackground(apiKey, reply);
+      attachRollActions(reply);
+      if (/セッション終了/.test(reply)) enterDebriefMode();
+    }
     await speakText(apiKey, reply);
   } catch (err) {
     removeThinkingEntry();
     setStatus('エラー: ' + err.message, 'error');
   }
+}
+
+// シナリオ終了 → 振り返り（分岐・もしもの質問）モードへ
+function enterDebriefMode() {
+  if (debriefMode) return;
+  debriefMode = true;
+  saveSession();
+  showDebriefControls();
+  const input = document.getElementById('text-input');
+  if (input) input.placeholder = '振り返りの質問（例：あの時逃げていたら？）';
+}
+
+function showDebriefControls() {
+  if (document.getElementById('debrief-actions')) return;
+  addLog('SYSTEM', '── シナリオ終了 ── 振り返りモードです。物語の分岐や「あの時こうしていたら？」を質問できます。', 'system');
+  const log = document.getElementById('log');
+  if (!log) return;
+  const row = document.createElement('div');
+  row.className = 'roll-actions';
+  row.id = 'debrief-actions';
+  const qs = ['別の選択をしていたら？', '隠されていた真相は？', '選ばなかった分岐の結末は？', '自分の選択を評価して'];
+  row.innerHTML = qs.map(q => `<button class="sq-btn" onclick="askDebrief('${q}')">💬 ${q}</button>`).join('');
+  log.appendChild(row);
+  scrollChatToBottom();
+}
+
+function askDebrief(q) {
+  const apiKey = document.getElementById('api-key').value.trim();
+  if (apiKey) processPlayerInput(apiKey, q);
 }
 
 function showTextInput(apiKey) {
@@ -3431,6 +3479,7 @@ async function startSession() {
   currentSessionId = null;
   currentSceneLocation = null;
   gmReplyLocation = null;
+  debriefMode = false;
   _sessionStartedAt = new Date().toISOString();
 
   try {
@@ -3473,6 +3522,7 @@ async function startSession() {
 
 function endSession() {
   sessionActive = false;
+  debriefMode = false;
   if (window._recognition) window._recognition.abort();
   _ttsSeq++;            // 進行中のTTSを無効化
   stopCurrentAudio();   // 再生中の音声を停止

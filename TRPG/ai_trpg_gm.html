@@ -455,6 +455,10 @@
   .sq-btn.ex-skill { border-color: rgba(212,160,0,0.3); }
   .sq-btn.ex-skill:hover { border-color: #d4a000; }
 
+  /* チャット内に差し込むロール（判定）ボタン列 */
+  .roll-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; padding-left: 80px; }
+  @media (max-width: 768px) { .roll-actions { padding-left: 0; } }
+
   /* 技能確認モーダル */
   #skill-confirm-overlay {
     display: none;
@@ -2111,6 +2115,9 @@ async function resumeSession(sess) {
 
   const apiKey = document.getElementById('api-key').value.trim();
   showTextInput(apiKey);
+  // 直近のGM発言にロール要求があればボタンを復元
+  const lastDl = [...sessionLogEntries].reverse().find(e => e.cls === 'dl' || e.speaker === 'DL');
+  if (lastDl) attachRollActions(lastDl.text);
   scrollChatToBottom();
 }
 
@@ -2842,26 +2849,133 @@ async function executeSkillRoll() {
 
   if (!sessionActive) return;
 
-  const resultText = `〈${name}〉で技能判定を行いました。${count}D10≤${target}：出目[${rolls.join(', ')}]　成功数${successes}→【${grade}】。この判定結果を踏まえて物語を進めてください。`;
-  addLog('SKILL', `〈${name}〉判定 ${count}D10≤${target}：[${rolls.join(', ')}] 成功数${successes}→【${grade}】`, 'system');
+  await reportRollToGM(
+    'SKILL',
+    `〈${name}〉判定 ${count}D10≤${target}：[${rolls.join(', ')}] 成功数${successes}→【${grade}】`,
+    `〈${name}〉で技能判定を行いました。${count}D10≤${target}：出目[${rolls.join(', ')}]　成功数${successes}→【${grade}】。この判定結果を踏まえて物語を進めてください。`
+  );
+}
 
+// ─── 判定結果をGMへ渡す共通処理＋チャット内ロールボタン ───
+async function reportRollToGM(logSpeaker, logText, gmPromptText) {
+  addLog(logSpeaker, logText, 'system');
+  if (!sessionActive) return;
   const apiKey = document.getElementById('api-key').value.trim();
   if (!apiKey) return;
-
   addThinkingEntry();
   setStatus('ディーラーが判定結果を反映しています...', 'active');
   try {
-    const reply = await sendMessage(apiKey, resultText);
+    const reply = await sendMessage(apiKey, gmPromptText);
     removeThinkingEntry();
     addLog('DL', reply);
     saveSceneDescription(reply);
     setStatus('');
     updateSceneBackground(apiKey, reply);
+    attachRollActions(reply);
     await speakText(apiKey, reply);
   } catch (err) {
     removeThinkingEntry();
     setStatus('エラー: ' + err.message, 'error');
   }
+}
+
+// 共鳴判定（精神を基準にしたダイスプール）
+async function rollKyoumei() {
+  if (!sessionActive) return;
+  const mind = getAbility('ab-mind');
+  const count = Math.max(1, mind);
+  const target = Math.min(Math.max(mind, 1), 10);
+  const r = rollDicePool(count, target);
+  const resultEl = document.getElementById('dice-result');
+  if (resultEl) {
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `共鳴判定 [${r.display}] 成功数: ${r.successes} → <span class="result-grade ${r.gradeClass}">${r.grade}</span>`;
+  }
+  const howling = r.successes >= 3 ? '（トリプル以上：ハウリングの兆し）' : '';
+  await reportRollToGM(
+    '共鳴',
+    `共鳴判定 ${count}D10≤${target}：[${r.rolls.join(', ')}] 成功数${r.successes}→【${r.grade}】`,
+    `共鳴判定を行いました。${count}D10≤${target}：出目[${r.rolls.join(', ')}]　成功数${r.successes}→【${r.grade}】${howling}。エモクロアのルールに従い、成功なら物語を進展させつつ〈∞共鳴〉レベルの上昇を明記し、トリプル以上ならハウリング（変容）を描写してください。`
+  );
+}
+
+// GMが指定した汎用ダイス
+async function rollSpecifiedDice(count, target) {
+  if (!sessionActive) return;
+  const r = rollDicePool(count, target);
+  const resultEl = document.getElementById('dice-result');
+  if (resultEl) {
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `[${r.display}] 成功数: ${r.successes} → <span class="result-grade ${r.gradeClass}">${r.grade}</span>`;
+  }
+  await reportRollToGM(
+    'DICE',
+    `${count}D10≤${target}：[${r.rolls.join(', ')}] 成功数${r.successes}→【${r.grade}】`,
+    `指定の判定を行いました。${count}D10≤${target}：出目[${r.rolls.join(', ')}]　成功数${r.successes}→【${r.grade}】。この結果を踏まえて物語を進めてください。`
+  );
+}
+
+// GM応答にロール要求が含まれていれば、チャット内に「振る」ボタンを差し込む
+function attachRollActions(reply) {
+  if (!sessionActive || !reply) return;
+  const log = document.getElementById('log');
+  const lastEntry = log && log.lastElementChild;
+  if (!lastEntry) return;
+
+  const actions = [];
+  const seen = new Set();
+  // 取得済み技能で、本文に〈技能名〉が出ているもの
+  for (const cat of SKILL_DATA) {
+    for (const s of cat.skills) {
+      if (getSkillLevel(s.id) <= 0 || seen.has(s.id)) continue;
+      if (reply.includes(`〈${s.name}〉`)) {
+        seen.add(s.id);
+        actions.push(`<button class="sq-btn" onclick="openSkillConfirm('${s.id}')">🎲〈${s.name}〉で判定</button>`);
+      }
+    }
+  }
+  // 共鳴判定
+  if (/共鳴判定/.test(reply)) {
+    actions.push(`<button class="sq-btn ex-skill" onclick="rollKyoumei()">🎲 共鳴判定</button>`);
+  }
+  // 技能・共鳴が拾えなかった場合のフォールバック
+  if (actions.length === 0) {
+    const m = reply.match(/(\d+)\s*[dDＤ]\s*10\s*[≤<＜=]+\s*(\d+)/);
+    if (m) {
+      actions.push(`<button class="sq-btn" onclick="rollSpecifiedDice(${parseInt(m[1],10)},${parseInt(m[2],10)})">🎲 ${parseInt(m[1],10)}D10≤${parseInt(m[2],10)} を振る</button>`);
+    } else if (/判定(?:して|を|が必要)/.test(reply)) {
+      actions.push(`<button class="sq-btn" onclick="toggleSkillQuickPanel()">🎲 技能を選んで判定</button>`);
+    }
+  }
+  if (actions.length === 0) return;
+
+  const row = document.createElement('div');
+  row.className = 'roll-actions';
+  row.innerHTML = actions.join('');
+  log.appendChild(row);
+  scrollChatToBottom();
+}
+
+// ダイスプールを振って成功数・成功度・表示用HTMLを返す
+function rollDicePool(count, target) {
+  const rolls = [];
+  for (let i = 0; i < count; i++) rolls.push(Math.floor(Math.random() * 10) + 1);
+  let successes = 0;
+  const display = rolls.map(r => {
+    if (r === 1) { successes += 2; return `<span style="color:#f0a000">${r}★</span>`; }
+    if (r === 10) { successes -= 1; return `<span style="color:var(--red-bright)">${r}✕</span>`; }
+    if (r <= target) { successes++; return `<span style="color:var(--teal-bright)">${r}</span>`; }
+    return `<span style="color:var(--text-dim)">${r}</span>`;
+  }).join(' ');
+  let grade, gradeClass;
+  if (successes <= -1) { grade = 'ファンブル'; gradeClass = 'fumble'; }
+  else if (successes === 0) { grade = '失敗'; gradeClass = 'fumble'; }
+  else if (successes === 1) { grade = 'シングル'; gradeClass = ''; }
+  else if (successes === 2) { grade = 'ダブル'; gradeClass = ''; }
+  else if (successes === 3) { grade = 'トリプル'; gradeClass = 'critical'; }
+  else if (successes <= 9) { grade = 'ミラクル'; gradeClass = 'critical'; }
+  else { grade = 'カタストロフ'; gradeClass = 'critical'; }
+  return { rolls, successes, grade, gradeClass, display };
 }
 
 // ─── セッションステータス更新 ─────────────────
@@ -2967,7 +3081,8 @@ function buildSystemPrompt() {
 - 場面には具体的な場所・時間・人物・物音や匂いなどの五感描写を必ず含める
 - 現代日本の日常描写と《怪異》の超常的な恐怖・神秘を対比させる
 - プレイヤーの行動に世界観に沿った結果をフィードバックする
-- 判定が必要な場面では「〈技能名〉で判定してください」と告げる
+- 技能判定が必要な場面では、対象技能を必ず全角山括弧で囲み「〈技能名〉で判定してください」と告げる（アプリが自動でチャットに判定ボタンを表示する）。技能名は共鳴者が取得済みの技能から選ぶ。
+- 《怪異》への共鳴を試みる場面では「共鳴判定を行ってください」と明記する（共鳴判定ボタンが表示される）。
 - 判定結果が提示された場合（シングル/ダブル等）は、その成功度に応じた描写をする
 - 〈∞共鳴〉が上昇する場面では必ずその旨を伝える（例：「∞共鳴がLv.Xに上昇します」）
 - 物語を一方的に進めず、応答の最後は必ずプレイヤーへの具体的な問いかけ（状況に応じた行動の選択肢提示や「あなたはどうする？」等）で締める
@@ -3200,6 +3315,7 @@ function startRecognition(apiKey) {
       saveSceneDescription(reply);
       setStatus('');
       updateSceneBackground(apiKey, reply);
+      attachRollActions(reply);
       await speakText(apiKey, reply);
     } catch (err) {
       removeThinkingEntry();
@@ -3259,6 +3375,7 @@ async function sendTextInput() {
     saveSceneDescription(reply);
     setStatus('');
     updateSceneBackground(apiKey, reply);
+    attachRollActions(reply);
     await speakText(apiKey, reply);
   } catch (err) {
     removeThinkingEntry();

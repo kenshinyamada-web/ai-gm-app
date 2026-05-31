@@ -417,6 +417,91 @@
   .dice-result .result-grade.critical { color: #f0a000; }
   .dice-result .result-grade.fumble { color: var(--red-bright); }
 
+  /* 技能クイックパネル */
+  #skill-quick-panel {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+  }
+  .sq-title {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    color: var(--purple);
+    letter-spacing: 0.15em;
+    margin-bottom: 8px;
+  }
+  .sq-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .sq-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: 'Noto Serif JP', serif;
+    font-size: 12px;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    white-space: nowrap;
+  }
+  .sq-btn:hover { border-color: var(--purple-dim); background: rgba(138,111,200,0.1); }
+  .sq-btn:active { background: rgba(138,111,200,0.2); }
+  .sq-btn .sq-lv { font-size: 10px; color: var(--teal); margin-left: 4px; }
+  .sq-btn.ex-skill { border-color: rgba(212,160,0,0.3); }
+  .sq-btn.ex-skill:hover { border-color: #d4a000; }
+
+  /* 技能確認モーダル */
+  #skill-confirm-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    justify-content: center;
+    align-items: center;
+  }
+  #skill-confirm-modal {
+    background: var(--surface);
+    border: 1px solid var(--purple-dim);
+    border-radius: 6px;
+    padding: 24px;
+    max-width: 340px;
+    width: 90%;
+    text-align: center;
+  }
+  .scm-skill-name {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    color: var(--purple-bright);
+    margin-bottom: 6px;
+  }
+  .scm-detail {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .scm-dice-info {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    color: var(--teal-bright);
+    margin: 14px 0;
+    padding: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+  }
+  .scm-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 16px;
+  }
+
   /* コントロール */
   .controls {
     display: flex;
@@ -856,6 +941,10 @@
     /* シナリオボックス */
     #scenario-box { padding: 14px; }
     .scenario-text { font-size: 15px; line-height: 1.85; }
+
+    /* 技能クイックパネル */
+    #skill-quick-panel { padding: 8px 10px; }
+    .sq-btn { font-size: 13px; padding: 10px 14px; min-height: 40px; }
 
     /* ダイスパネル */
     #dice-panel { padding: 12px; }
@@ -1436,6 +1525,12 @@
     <div class="dice-result" id="dice-result" style="display:none;"></div>
   </div>
 
+  <!-- 技能クイックパネル -->
+  <div id="skill-quick-panel">
+    <div class="sq-title">技能判定</div>
+    <div class="sq-grid" id="sq-grid"></div>
+  </div>
+
   <!-- 音声エリア -->
   <div class="voice-area" id="voice-area">
     <button id="voice-btn" onclick="toggleVoice()">
@@ -1445,7 +1540,8 @@
     </button>
     <div class="voice-hint" id="voice-hint">ボタンを押して話す</div>
     <div class="controls">
-      <button class="btn btn-teal" onclick="toggleDicePanel()">ダイス判定</button>
+      <button class="btn btn-teal" onclick="toggleSkillQuickPanel()">技能判定</button>
+      <button class="btn btn-teal" onclick="toggleDicePanel()" style="font-size:9px;padding:8px 10px;">手動ダイス</button>
       <button class="btn btn-secondary" onclick="endSession()">セッション終了</button>
     </div>
   </div>
@@ -1505,6 +1601,19 @@
         <button class="btn btn-secondary" onclick="toggleApiKeyVisibility()" id="api-key-toggle" style="font-size:10px;padding:8px 14px;">表示</button>
       </div>
       <div id="settings-status" style="font-size:13px;color:var(--teal);font-style:italic;min-height:20px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 技能確認モーダル -->
+<div id="skill-confirm-overlay" onclick="closeSkillConfirm(event)">
+  <div id="skill-confirm-modal">
+    <div class="scm-skill-name" id="scm-skill-name"></div>
+    <div class="scm-detail" id="scm-ability"></div>
+    <div class="scm-dice-info" id="scm-dice-info"></div>
+    <div class="scm-buttons">
+      <button class="btn btn-secondary" onclick="closeSkillConfirm()">キャンセル</button>
+      <button class="btn btn-primary" id="scm-roll-btn" onclick="executeSkillRoll()">判定する</button>
     </div>
   </div>
 </div>
@@ -1886,7 +1995,7 @@ function toggleBgGeneration() {
 }
 
 async function extractScenePrompt(apiKey, sceneText) {
-  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -2103,6 +2212,139 @@ function toggleDicePanel() {
   panel.style.flexDirection = 'column';
 }
 
+// ─── 技能クイックパネル ────────────────────────
+let pendingSkillRoll = null;
+
+function calcSkillTarget(skill) {
+  const abilityStr = skill.ability;
+  const lv = getSkillLevel(skill.id);
+  const abilityMap = {
+    '身体': 'ab-body', '器用': 'ab-dex', '精神': 'ab-mind',
+    '五感': 'ab-sense', '知力': 'ab-int', '魅力': 'ab-charm',
+    '社会': 'ab-social', '運勢': 'ab-luck'
+  };
+  // Parse ability names from the string (e.g. 【身体/器用】+Lv)
+  const names = abilityStr.replace(/[【】]/g, '').replace(/[+＋]Lv/g, '').replace(/÷2/g, '').split('/');
+  let maxVal = 0;
+  for (const n of names) {
+    const key = abilityMap[n.trim()];
+    if (key) maxVal = Math.max(maxVal, getAbility(key));
+  }
+  const hasLvBonus = /[+＋]Lv/.test(abilityStr);
+  const hasHalf = /÷2/.test(abilityStr);
+  let target = maxVal;
+  if (hasLvBonus) target += lv;
+  if (hasHalf) target = Math.floor(target / 2);
+  return Math.min(Math.max(target, 1), 10);
+}
+
+function renderSkillQuickPanel() {
+  const grid = document.getElementById('sq-grid');
+  if (!grid) return;
+  let html = '';
+  for (const cat of SKILL_DATA) {
+    for (const s of cat.skills) {
+      const lv = getSkillLevel(s.id);
+      if (lv <= 0) continue;
+      let nm = s.name;
+      if (s.custom && skillCustoms[s.id]) nm += `：${skillCustoms[s.id]}`;
+      const exCls = s.ex ? ' ex-skill' : '';
+      html += `<button class="sq-btn${exCls}" onclick="openSkillConfirm('${s.id}')">`;
+      html += `${nm}<span class="sq-lv">Lv${lv}</span></button>`;
+    }
+  }
+  grid.innerHTML = html;
+}
+
+function toggleSkillQuickPanel() {
+  const panel = document.getElementById('skill-quick-panel');
+  if (panel.style.display === 'block') {
+    panel.style.display = 'none';
+  } else {
+    renderSkillQuickPanel();
+    panel.style.display = 'block';
+  }
+}
+
+function openSkillConfirm(id) {
+  const skill = findSkill(id);
+  if (!skill) return;
+  const lv = getSkillLevel(id);
+  const target = calcSkillTarget(skill);
+  let nm = skill.name;
+  if (skill.custom && skillCustoms[id]) nm += `：${skillCustoms[id]}`;
+  pendingSkillRoll = { id, name: nm, count: lv, target };
+
+  document.getElementById('scm-skill-name').textContent = `〈${nm}〉Lv${lv}`;
+  document.getElementById('scm-ability').textContent = `判定値：${skill.ability}`;
+  document.getElementById('scm-dice-info').textContent = `${lv}D10 ≤ ${target}`;
+  const overlay = document.getElementById('skill-confirm-overlay');
+  overlay.style.display = 'flex';
+}
+
+function closeSkillConfirm(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('skill-confirm-overlay').style.display = 'none';
+  pendingSkillRoll = null;
+}
+
+async function executeSkillRoll() {
+  if (!pendingSkillRoll) return;
+  const { name, count, target } = pendingSkillRoll;
+  closeSkillConfirm();
+
+  const rolls = [];
+  for (let i = 0; i < count; i++) rolls.push(Math.floor(Math.random() * 10) + 1);
+
+  let successes = 0;
+  const rollDisplay = rolls.map(r => {
+    if (r === 1) { successes += 2; return `<span style="color:#f0a000">${r}★</span>`; }
+    if (r === 10) { successes -= 1; return `<span style="color:var(--red-bright)">${r}✕</span>`; }
+    if (r <= target) { successes++; return `<span style="color:var(--teal-bright)">${r}</span>`; }
+    return `<span style="color:var(--text-dim)">${r}</span>`;
+  }).join(' ');
+
+  let grade;
+  if (successes <= -1) grade = 'ファンブル';
+  else if (successes === 0) grade = '失敗';
+  else if (successes === 1) grade = 'シングル';
+  else if (successes === 2) grade = 'ダブル';
+  else if (successes === 3) grade = 'トリプル';
+  else if (successes <= 9) grade = 'ミラクル';
+  else grade = 'カタストロフ';
+
+  const gradeClass = (successes <= 0) ? 'fumble' : (successes >= 3) ? 'critical' : '';
+  const resultEl = document.getElementById('dice-result');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = `〈${name}〉 [${rollDisplay}] 成功数: ${successes} → <span class="result-grade ${gradeClass}">${grade}</span>`;
+  const panel = document.getElementById('dice-panel');
+  panel.style.display = 'flex';
+  panel.style.flexDirection = 'column';
+
+  if (!sessionActive) return;
+
+  const resultText = `〈${name}〉で技能判定を行いました。${count}D10≤${target}：出目[${rolls.join(', ')}]　成功数${successes}→【${grade}】。この判定結果を踏まえて物語を進めてください。`;
+  addLog('SKILL', `〈${name}〉判定 ${count}D10≤${target}：[${rolls.join(', ')}] 成功数${successes}→【${grade}】`, 'system');
+
+  const apiKey = document.getElementById('api-key').value.trim();
+  if (!apiKey) return;
+
+  addThinkingEntry();
+  setStatus('ディーラーが判定結果を反映しています...', 'active');
+  try {
+    const reply = await sendMessage(apiKey, resultText);
+    removeThinkingEntry();
+    addLog('DL', reply);
+    saveSceneDescription(reply);
+    setStatus('');
+    updateSceneBackground(apiKey, reply);
+    await speakText(apiKey, reply);
+  } catch (err) {
+    removeThinkingEntry();
+    setStatus('エラー: ' + err.message, 'error');
+  }
+}
+
 // ─── セッションステータス更新 ─────────────────
 function updateSessionStats() {
   document.getElementById('sess-hp').textContent = `${currentHP} / ${maxHP}`;
@@ -2213,7 +2455,7 @@ function buildSystemPrompt() {
 
 // ─── API ────────────────────────────────────
 async function generateOpening(apiKey) {
-  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -2229,7 +2471,7 @@ async function generateOpening(apiKey) {
 
 async function sendMessage(apiKey, userText) {
   conversationHistory.push({ role: 'user', parts: [{ text: userText }] });
-  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -2462,6 +2704,7 @@ function endSession() {
   document.getElementById('voice-btn').style.display = 'none';
   document.getElementById('session-stats').style.display = 'none';
   document.getElementById('dice-panel').style.display = 'none';
+  document.getElementById('skill-quick-panel').style.display = 'none';
   document.getElementById('char-panel').style.display = 'flex';
   document.getElementById('main-controls').style.display = 'flex';
   document.getElementById('start-btn').disabled = false;

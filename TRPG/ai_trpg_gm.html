@@ -1198,8 +1198,8 @@
 
   /* ─── ゲーム画面チャットドック ───────────────── */
   /* 非セッション時はラッパーを無効化し、子要素を通常フローに戻す */
-  #chat-dock, #dock-body { display: contents; }
-  #dock-resize { display: none; }
+  #chat-dock, #dock-main, #dock-body { display: contents; }
+  #dock-resize, #dock-vresize { display: none; }
 
   /* セッション中：背景を明るくしてゲーム画面らしく */
   body.session-active #scene-bg { filter: brightness(0.55) saturate(0.85); }
@@ -1224,11 +1224,20 @@
     border-top: 1px solid var(--purple-dim);
     box-shadow: 0 -8px 30px rgba(0,0,0,0.55);
   }
+  /* チャット（左）と操作パネル（右）の横並び */
+  body.session-active #dock-main {
+    display: flex;
+    flex-direction: row;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 14px;
+  }
   body.session-active #dock-body {
     display: flex;
     flex-direction: column;
     gap: 14px;
     flex: 1 1 auto;
+    min-width: 0;
     min-height: 0;
     overflow-y: auto;
     padding: 4px 4px 8px;
@@ -1269,11 +1278,52 @@
     padding: 0;
   }
   body.session-active #scenario-box { background: rgba(20,18,35,0.55); }
+
+  /* 操作パネル：チャットの右側にまとめた縦列 */
   body.session-active #voice-area {
     flex: 0 0 auto;
-    padding-top: 10px;
-    border-top: 1px solid var(--border);
+    width: var(--dock-controls-w, 200px);
+    align-self: stretch;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 4px 2px 4px 14px;
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
   }
+  /* チャットと操作パネルの間の幅調整ハンドル */
+  body.session-active #dock-vresize {
+    display: block;
+    flex: 0 0 auto;
+    width: 12px;
+    margin: 0 -4px;
+    cursor: col-resize;
+    position: relative;
+    touch-action: none;
+  }
+  body.session-active #dock-vresize::before {
+    content: '';
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px; height: 42px;
+    border-radius: 2px;
+    background: var(--purple-dim);
+    transition: background 0.2s;
+  }
+  body.session-active #dock-vresize:hover::before { background: var(--purple-bright); }
+
+  body.session-active #voice-area #voice-btn { align-self: center; }
+  body.session-active #voice-area .voice-hint { text-align: center; }
+  body.session-active #voice-area #text-input-row { width: 100%; }
+  body.session-active #voice-area .controls {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 8px;
+  }
+  body.session-active #voice-area .controls .btn { width: 100%; }
   body.session-active #status { flex: 0 0 auto; }
 
   /* 背景トグルはドックの上に逃がす */
@@ -1282,6 +1332,25 @@
   /* 固定ドック分の余白を本文に確保 */
   body.session-active .container {
     padding-bottom: calc(var(--dock-h, 42vh) + 24px);
+  }
+
+  /* スマホ：横並びだと窮屈なので縦積みに戻す */
+  @media (max-width: 768px) {
+    body.session-active #dock-main { flex-direction: column; }
+    body.session-active #dock-vresize { display: none; }
+    body.session-active #voice-area {
+      width: 100%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      border-left: none;
+      border-top: 1px solid var(--border);
+      padding: 8px 2px 2px;
+    }
+    body.session-active #voice-area .controls { flex-direction: row; width: auto; }
+    body.session-active #voice-area .controls .btn { width: auto; }
+    body.session-active #voice-area #text-input-row { width: 100%; }
   }
 </style>
 </head>
@@ -1593,6 +1662,7 @@
   <!-- ゲーム画面下部のチャットドック -->
   <div id="chat-dock">
   <div id="dock-resize" title="ドラッグで高さを調整"></div>
+  <div id="dock-main">
   <div id="dock-body">
 
   <!-- オープニングシーン -->
@@ -1626,6 +1696,8 @@
 
   </div><!-- /dock-body -->
 
+  <div id="dock-vresize" title="ドラッグで操作パネルの幅を調整"></div>
+
   <!-- 音声エリア -->
   <div class="voice-area" id="voice-area">
     <button id="voice-btn" onclick="toggleVoice()">
@@ -1640,6 +1712,7 @@
       <button class="btn btn-secondary" onclick="endSession()">セッション終了</button>
     </div>
   </div>
+  </div><!-- /dock-main -->
 
   <div id="status"></div>
   </div><!-- /chat-dock -->
@@ -3489,6 +3562,7 @@ function updateSaveBar(data) {
 // ─── 初期化 ──────────────────────────────────
 // ─── チャットドックの高さ調整（ドラッグでリサイズ） ───
 const DOCK_H_KEY = 'emokroa_dock_height';
+const DOCK_CW_KEY = 'emokroa_dock_controls_width';
 (function initDockResize() {
   const dock = document.getElementById('chat-dock');
   const handle = document.getElementById('dock-resize');
@@ -3518,6 +3592,33 @@ const DOCK_H_KEY = 'emokroa_dock_height';
   handle.addEventListener('touchstart', start, { passive: false });
   window.addEventListener('touchmove', (e) => { if (dragging) { onMove(e.touches[0].clientY); e.preventDefault(); } }, { passive: false });
   window.addEventListener('touchend', end);
+
+  // 操作パネル（右列）の幅調整
+  const vhandle = document.getElementById('dock-vresize');
+  if (vhandle) {
+    const savedW = parseInt(localStorage.getItem(DOCK_CW_KEY), 10);
+    if (savedW) document.documentElement.style.setProperty('--dock-controls-w', savedW + 'px');
+    const clampW = (w) => Math.max(140, Math.min(window.innerWidth * 0.6, w));
+    let vdrag = false;
+    function onMoveX(clientX) {
+      const w = clampW(window.innerWidth - clientX);
+      document.documentElement.style.setProperty('--dock-controls-w', w + 'px');
+    }
+    function startX(e) { vdrag = true; document.body.style.userSelect = 'none'; e.preventDefault(); }
+    function endX() {
+      if (!vdrag) return;
+      vdrag = false;
+      document.body.style.userSelect = '';
+      const w = parseInt(getComputedStyle(document.getElementById('voice-area')).width, 10);
+      if (w) localStorage.setItem(DOCK_CW_KEY, w);
+    }
+    vhandle.addEventListener('mousedown', startX);
+    window.addEventListener('mousemove', (e) => { if (vdrag) onMoveX(e.clientX); });
+    window.addEventListener('mouseup', endX);
+    vhandle.addEventListener('touchstart', startX, { passive: false });
+    window.addEventListener('touchmove', (e) => { if (vdrag) { onMoveX(e.touches[0].clientX); e.preventDefault(); } }, { passive: false });
+    window.addEventListener('touchend', endX);
+  }
 })();
 
 (async function init() {

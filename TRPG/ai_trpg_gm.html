@@ -1283,6 +1283,22 @@
   body.session-active .scenario-text,
   body.session-active .log-speaker { text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
 
+  /* 技能判定・手動ダイスのパネルはチャットに被らないよう右端に浮かせる */
+  body.session-active #skill-quick-panel,
+  body.session-active #dice-panel {
+    position: fixed;
+    right: 12px;
+    bottom: calc(var(--dock-h, 42vh) + 12px);
+    width: min(340px, 92vw);
+    max-height: 56vh;
+    overflow-y: auto;
+    z-index: 120;
+    background: rgba(14,14,26,0.97);
+    box-shadow: 0 10px 34px rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
   /* 操作パネル：チャットの右側にまとめた縦列 */
   body.session-active #voice-area {
     flex: 0 0 auto;
@@ -2673,7 +2689,9 @@ function rollDice() {
 
 function toggleDicePanel() {
   const panel = document.getElementById('dice-panel');
-  panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+  const show = panel.style.display !== 'flex';
+  if (show) document.getElementById('skill-quick-panel').style.display = 'none';
+  panel.style.display = show ? 'flex' : 'none';
   panel.style.flexDirection = 'column';
 }
 
@@ -2726,6 +2744,7 @@ function toggleSkillQuickPanel() {
   if (panel.style.display === 'block') {
     panel.style.display = 'none';
   } else {
+    document.getElementById('dice-panel').style.display = 'none';
     renderSkillQuickPanel();
     panel.style.display = 'block';
   }

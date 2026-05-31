@@ -3043,12 +3043,33 @@ async function sendMessage(apiKey, userText) {
   return replyText;
 }
 
+// 再生中の音声と進行中のTTS取得を管理し、最新の発話だけを再生する
+let _ttsSeq = 0;
+let _currentAudio = null;
+let _currentTtsController = null;
+
+function stopCurrentAudio() {
+  if (_currentAudio) {
+    try { _currentAudio.pause(); _currentAudio.currentTime = 0; } catch (e) {}
+    if (_currentAudio.src) { try { URL.revokeObjectURL(_currentAudio.src); } catch (e) {} }
+    _currentAudio = null;
+  }
+}
+
 async function speakText(apiKey, text, force = false) {
   if (!ttsEnabled && !force) return;
+  // この発話の通し番号。新しい発話が始まったら古い処理は破棄する
+  const myTurn = ++_ttsSeq;
+  // 再生中の音声を止め、進行中のTTS生成も中断（重なり防止）
+  stopCurrentAudio();
+  if (_currentTtsController) { try { _currentTtsController.abort(); } catch (e) {} }
+  const controller = new AbortController();
+  _currentTtsController = controller;
   try {
     const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         contents: [{ parts: [{ text }] }],
         generationConfig: {
@@ -3058,6 +3079,8 @@ async function speakText(apiKey, text, force = false) {
       })
     });
     const data = await resp.json();
+    // 取得中に新しい発話が始まっていたら、この（古い）音声は再生しない
+    if (myTurn !== _ttsSeq) return;
     if (data.error || !data.candidates) return;
     const part = data.candidates[0]?.content?.parts[0]?.inlineData;
     const audioData = part?.data;
@@ -3067,9 +3090,19 @@ async function speakText(apiKey, text, force = false) {
     const rateMatch = /rate=(\d+)/.exec(part.mimeType || '');
     const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
     const wav = pcmToWav(pcm, sampleRate);
-    const audio = new Audio(URL.createObjectURL(new Blob([wav], { type: 'audio/wav' })));
+    const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+    // 直前の最終チェック：まだ最新の発話ならば再生する
+    if (myTurn !== _ttsSeq) { URL.revokeObjectURL(url); return; }
+    stopCurrentAudio();
+    const audio = new Audio(url);
+    _currentAudio = audio;
+    audio.addEventListener('ended', () => {
+      if (_currentAudio === audio) { URL.revokeObjectURL(url); _currentAudio = null; }
+    });
     await audio.play();
-  } catch (e) { console.warn('TTS error:', e); }
+  } catch (e) {
+    if (e.name !== 'AbortError') console.warn('TTS error:', e);
+  }
 }
 
 // 生 PCM (16bit LE / モノラル) に WAV ヘッダーを付与して再生可能にする
@@ -3263,6 +3296,8 @@ async function startSession() {
 function endSession() {
   sessionActive = false;
   if (window._recognition) window._recognition.abort();
+  _ttsSeq++;            // 進行中のTTSを無効化
+  stopCurrentAudio();   // 再生中の音声を停止
   // セッションをIndexedDBに完了保存
   saveSession(true);
   // ∞共鳴レベルを含めてセッション終了時にlocalStorageにも保存

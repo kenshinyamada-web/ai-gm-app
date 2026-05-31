@@ -1204,6 +1204,9 @@
   /* セッション中：背景を明るくしてゲーム画面らしく */
   body.session-active #scene-bg { filter: brightness(0.55) saturate(0.85); }
 
+  /* セッション中は画面上部のタイトルを非表示 */
+  body.session-active header { display: none; }
+
   /* セッション中：下部に固定されるリサイズ可能なチャット欄 */
   body.session-active #chat-dock {
     display: flex;

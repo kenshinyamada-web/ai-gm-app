@@ -2514,12 +2514,42 @@ async function speakText(apiKey, text) {
     });
     const data = await resp.json();
     if (data.error || !data.candidates) return;
-    const audioData = data.candidates[0]?.content?.parts[0]?.inlineData?.data;
+    const part = data.candidates[0]?.content?.parts[0]?.inlineData;
+    const audioData = part?.data;
     if (!audioData) return;
-    const bytes = new Uint8Array(atob(audioData).split('').map(c => c.charCodeAt(0)));
-    const audio = new Audio(URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' })));
-    audio.play();
+    const pcm = new Uint8Array(atob(audioData).split('').map(c => c.charCodeAt(0)));
+    // Gemini TTS は WAV ヘッダーのない生 PCM (16bit LE / モノラル) を返すので自前で WAV 化する
+    const rateMatch = /rate=(\d+)/.exec(part.mimeType || '');
+    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+    const wav = pcmToWav(pcm, sampleRate);
+    const audio = new Audio(URL.createObjectURL(new Blob([wav], { type: 'audio/wav' })));
+    await audio.play();
   } catch (e) { console.warn('TTS error:', e); }
+}
+
+// 生 PCM (16bit LE / モノラル) に WAV ヘッダーを付与して再生可能にする
+function pcmToWav(pcm, sampleRate) {
+  const numChannels = 1, bitsPerSample = 16;
+  const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+  const blockAlign = numChannels * bitsPerSample / 8;
+  const buffer = new ArrayBuffer(44 + pcm.length);
+  const view = new DataView(buffer);
+  const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + pcm.length, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeStr(36, 'data');
+  view.setUint32(40, pcm.length, true);
+  new Uint8Array(buffer, 44).set(pcm);
+  return buffer;
 }
 
 // ─── 音声認識 ────────────────────────────────
